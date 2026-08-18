@@ -1,0 +1,8 @@
+# Markdownlint config used by conform.nvim formatter (markdownlint-cli2 --fix).
+# Only enables fixable style rules — not used for linting diagnostics.
+config:
+  default: false
+  MD049:
+    style: "asterisk"
+customRules: []
+noInheritPaths: true

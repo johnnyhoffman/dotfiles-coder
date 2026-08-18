@@ -1,0 +1,14 @@
+# Markdownlint config used by nvim-lint for diagnostics (markdownlint-cli2).
+# Keeps all default rules ON except a couple noisy ones. (Distinct from
+# format.markdownlint-cli2.yaml, which is fix-only and disables all-but-fixable.)
+config:
+    MD007:
+        indent: 4 # nested bullets are indented 4 spaces in this setup
+    MD013: false # line length
+    MD040: false # fenced code blocks should have a language specified
+    MD041: false # first line in file should be a top-level heading
+    MD038: false # spaces inside code span elements
+    MD001: false # heading levels should only increment by one level at a time
+    MD024: false # multiple headings with the same content
+customRules: []
+noInheritPaths: true

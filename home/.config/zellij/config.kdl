@@ -1,0 +1,317 @@
+// Zellij config — hand-maintained.
+//
+// Keybinds start from scratch (clear-defaults=true) and lean on an F-key /
+// "hyper key" scheme that mirrors the QMK + window-manager bindings (see the
+// dotfiles keyboard notes). Each mode section below mirrors a Zellij construct
+// (pane/tab/session/scroll); a few nearly-global binds live in shared_except
+// blocks so they pop back to the right parent mode.
+
+keybinds clear-defaults=true {
+    // GLOBAL/STANDARD section
+    //
+    // Excludes some nearly-global keymaps placed in the section for the construct they apply to. Those are global except when in the mode where there is a simpler keymap defined.
+    locked {
+        bind "F5" { SwitchToMode "normal"; }
+    }
+    shared_except "locked" {
+        bind "F5" { SwitchToMode "locked"; }
+
+        bind "Shift F6" { Resize "Increase left"; }
+        bind "Shift F7" { Resize "Increase down"; }
+        bind "Shift F8" { Resize "Increase up"; }
+        bind "Shift F9" { Resize "Increase right"; }
+        bind "Alt F6" { MovePane "left"; }
+        bind "Alt F7" { MovePane "down"; }
+        bind "Alt F8" { MovePane "up"; }
+        bind "Alt F9" { MovePane "right"; }
+        bind "Alt Shift F6" { Resize "Decrease left"; }
+        bind "Alt Shift F7" { Resize "Decrease down"; }
+        bind "Alt Shift F8" { Resize "Decrease up"; }
+        bind "Alt Shift F9" { Resize "Decrease right"; }
+
+        bind "Alt F1" { TogglePaneInGroup; }
+        bind "Alt F2" { ToggleGroupMarking; }
+
+        bind "Ctrl F11" { PreviousSwapLayout; }
+        bind "Ctrl F12" { NextSwapLayout; }
+
+        // zj-which-key browser: scrollable, filterable list of ALL binds across
+        // every mode (↑↓ scroll · type to filter · Esc close). Repurposed from
+        // the old Alt Shift F10 = NewPane (unused; Shift F10 twice makes a pane).
+        bind "Alt Shift F10" {
+            LaunchOrFocusPlugin "file:~/.config/zellij/plugins/zj_which_key.wasm" {
+                floating true
+                role "browser"
+            }
+        }
+
+        bind "Alt Shift F1" { Quit; }
+    }
+    // escape and enter are used the same globally, but need to be defined separately so they can pop up to their parent modes
+    shared_except "normal" "locked" "entersearch" {
+        bind "enter" { SwitchToMode "normal"; }
+    }
+    shared_except "normal" "locked" "entersearch" "renametab" "renamepane" {
+        bind "esc" { SwitchToMode "normal"; }
+    }
+    entersearch {
+        bind "esc" { SwitchToMode "scroll"; }
+        bind "enter" { SwitchToMode "search"; }
+    }
+    renametab {
+        bind "esc" { UndoRenameTab; SwitchToMode "tab"; }
+    }
+    renamepane {
+        bind "esc" { UndoRenamePane; SwitchToMode "pane"; }
+    }
+
+    // PANE section
+    pane {
+        bind "h" { MoveFocus "left"; }
+        bind "j" { MoveFocus "down"; }
+        bind "k" { MoveFocus "up"; }
+        bind "l" { MoveFocus "right"; }
+
+        bind "r" { SwitchToMode "renamepane"; PaneNameInput 0; }
+
+        bind "n" { NewPane; }
+        bind "Shift F10" { NewPane; SwitchToMode "normal"; }
+        bind "x" { CloseFocus; SwitchToMode "normal"; }
+
+        bind "e" { TogglePaneEmbedOrFloating; SwitchToMode "normal"; }
+        bind "f" { ToggleFocusFullscreen; SwitchToMode "normal"; }
+
+        bind "i" { TogglePanePinned; SwitchToMode "normal"; }
+
+        bind "Ctrl n" { FocusNextPane; }
+        bind "Ctrl p" { FocusPreviousPane; }
+
+        bind "s" { NewPane "stacked"; SwitchToMode "normal"; }
+
+        bind "F" { ToggleFloatingPanes; SwitchToMode "normal"; }
+
+        bind "z" { TogglePaneFrames; SwitchToMode "normal"; }
+
+        bind "H" { MovePane "left"; }
+        bind "J" { MovePane "down"; }
+        bind "K" { MovePane "up"; }
+        bind "L" { MovePane "right"; }
+        bind "tab" { MovePane; }
+        bind "Shift tab" { MovePaneBackwards; }
+
+        bind "Alt h" { Resize "Increase left"; }
+        bind "Alt j" { Resize "Increase down"; }
+        bind "Alt k" { Resize "Increase up"; }
+        bind "Alt l" { Resize "Increase right"; }
+        bind "Alt H" { Resize "Decrease left"; }
+        bind "Alt J" { Resize "Decrease down"; }
+        bind "Alt K" { Resize "Decrease up"; }
+        bind "Alt L" { Resize "Decrease right"; }
+    }
+    shared_except "locked" "pane" {
+        bind "Shift F10" { SwitchToMode "pane"; }
+        // excluded from pane just because they visually override "f", etc. in the status bar
+        bind "F4" { ToggleFocusFullscreen; }
+        bind "Shift F4" { ToggleFloatingPanes; }
+        // excluded from pane just because they visually override "hjkl" in the status bar 
+        bind "F6" { MoveFocusOrTab "left"; }
+        bind "F7" { MoveFocus "down"; }
+        bind "F8" { MoveFocus "up"; }
+        bind "F9" { MoveFocusOrTab "right"; }
+    }
+
+    // TAB section
+    tab {
+        bind "h" { GoToPreviousTab; }
+        bind "l" { GoToNextTab; }
+        bind "1" { GoToTab 1; SwitchToMode "normal"; }
+        bind "2" { GoToTab 2; SwitchToMode "normal"; }
+        bind "3" { GoToTab 3; SwitchToMode "normal"; }
+        bind "4" { GoToTab 4; SwitchToMode "normal"; }
+        bind "5" { GoToTab 5; SwitchToMode "normal"; }
+        bind "6" { GoToTab 6; SwitchToMode "normal"; }
+        bind "7" { GoToTab 7; SwitchToMode "normal"; }
+        bind "8" { GoToTab 8; SwitchToMode "normal"; }
+        bind "9" { GoToTab 9; SwitchToMode "normal"; }
+        bind "[" { BreakPaneLeft; SwitchToMode "normal"; }
+        bind "]" { BreakPaneRight; SwitchToMode "normal"; }
+        bind "b" { BreakPane; SwitchToMode "normal"; }
+        bind "n" { NewTab; }
+        bind "Shift F5" { NewTab; SwitchToMode "normal"; }
+        bind "r" { SwitchToMode "renametab"; TabNameInput 0; }
+        bind "s" { ToggleActiveSyncTab; SwitchToMode "normal"; }
+        bind "x" { CloseTab; SwitchToMode "normal"; }
+        bind "tab" { ToggleTab; }
+    }
+    shared_except "locked" "tab" {
+        bind "Shift F5" { SwitchToMode "tab"; }
+        // excluded from tab just because they visually override "n", "h", etc. in the status bar 
+        bind "Alt Shift F5" { NewTab; }
+        bind "Alt F11" { GoToNextTab; }
+        bind "Alt Shift F11" { GoToPreviousTab; }
+    }
+
+    // SESSION section
+    session {
+        bind "F2" {
+            LaunchOrFocusPlugin "session-manager" {
+                floating true
+                multi_screen true
+                move_to_focused_tab true
+            }
+
+            SwitchToMode "normal"
+        }
+        bind "a" {
+            LaunchOrFocusPlugin "zellij:about" {
+                floating true
+                move_to_focused_tab true
+            }
+            SwitchToMode "normal"
+        }
+        bind "c" {
+            LaunchOrFocusPlugin "configuration" {
+                floating true
+                move_to_focused_tab true
+            }
+            SwitchToMode "normal"
+        }
+        bind "p" {
+            LaunchOrFocusPlugin "plugin-manager" {
+                floating true
+                move_to_focused_tab true
+            }
+            SwitchToMode "normal"
+        }
+        bind "s" {
+            LaunchOrFocusPlugin "zellij:share" {
+                floating true
+                move_to_focused_tab true
+            }
+            SwitchToMode "normal"
+        }
+        bind "d" { Detach; }
+    }
+
+    shared_except "locked" "session" {
+        bind "F2" { SwitchToMode "session"; }
+        // excluded from session just because it visually overrides "d" in the status bar 
+        bind "Shift F1" { Detach; }
+    }
+
+    // SCROLL/SEARCH section
+    scroll {
+        bind "e" { EditScrollback; SwitchToMode "normal"; }
+        bind "Alt F10" { SwitchToMode "entersearch"; SearchInput 0; }
+    }
+    search {
+        bind "c" { SearchToggleOption "CaseSensitivity"; }
+        bind "n" { Search "down"; }
+        bind "N" { Search "up"; }
+        bind "p" { Search "up"; }
+        bind "o" { SearchToggleOption "WholeWord"; }
+        bind "w" { SearchToggleOption "Wrap"; }
+    }
+    shared_among "scroll" "search" {
+        bind "G" { ScrollToBottom; SwitchToMode "normal"; }
+        bind "g" { ScrollToTop; SwitchToMode "normal"; }
+        bind "Alt j" { HalfPageScrollDown; }
+        bind "Alt k" { HalfPageScrollUp; }
+        bind "h" { PageScrollUp; }
+        bind "j" { ScrollDown; }
+        bind "k" { ScrollUp; }
+        bind "l" { PageScrollDown; }
+        bind "u" { HalfPageScrollUp; }
+    }
+    shared_except "locked" "scroll" "search" {
+        bind "Alt F10" { SwitchToMode "scroll"; }
+        bind "Shift F3" { EditScrollback; SwitchToMode "normal"; }
+    }
+}
+
+// Plugin aliases - can be used to change the implementation of Zellij
+// changing these requires a restart to take effect
+plugins {
+    about location="zellij:about"
+    compact-bar location="zellij:compact-bar"
+    configuration location="zellij:configuration"
+    filepicker location="zellij:strider"
+    plugin-manager location="zellij:plugin-manager"
+    session-manager location="zellij:session-manager"
+    status-bar location="zellij:status-bar"
+    strider location="zellij:strider"
+    tab-bar location="zellij:tab-bar"
+    welcome-screen location="zellij:session-manager" {
+        welcome_screen false
+    }
+}
+
+// Plugins to load in the background when a new session starts
+// eg. "file:/path/to/my-plugin.wasm"
+// eg. "https://example.com/my-plugin.wasm"
+load_plugins {
+    // zj-which-key: floating popup of the current mode's keybinds, shown after a
+    // brief pause when entering a non-normal mode (so a minimal bar is enough).
+    // Run plugins/build-zj-which-key.sh once per machine — it builds the wasm and
+    // pre-seeds this plugin's permissions.kdl so this background instance works
+    // silently (background plugins can't be granted interactively). Path uses ~
+    // (shell-expanded by Zellij).
+    "file:~/.config/zellij/plugins/zj_which_key.wasm" {
+        auto_show "true"
+        delay_secs "0.4"
+        position "bottom-right"
+        // Cap popup height at 90% of the screen so busy modes (e.g. pane) show
+        // all binds instead of "+N more". The popup is content-sized up to this
+        // cap, so small modes stay small. On short terminals a mode with more
+        // binds than fit still overflows — use the scrollable browser for those.
+        max_height_pct "90"
+    }
+}
+web_client {
+    font "monospace"
+}
+
+theme "catppuccin-mocha"
+default_mode "normal"
+// default_layout "welcome"
+default_layout "default"
+// mouse_mode true
+pane_frames false
+// mirror_session false
+// copy_on_select true
+
+// session_name "My singleton session"   // fixed session name (default: random)
+// attach_to_session true                 // with session_name, attach instead of erroring
+
+session_serialization true
+
+// serialize_pane_viewport false          // also serialize pane viewports (default: false)
+
+// Manual-only session saving:
+// Keep serialization enabled (required for `zellij action save-session` to write
+// real layout metadata — with `session_serialization false` even manual saves
+// produce an empty layout), but push the automatic interval out to ~1 year so
+// periodic auto-saves effectively never fire. Interval can't be 0 (zellij panics
+// on a zero-duration timer). Save on demand from the session-manager (F2 -> Ctrl+a),
+// or via the CLI: `zellij action save-session`.
+serialization_interval 31536000
+
+// Web server / sharing (all default off; require restart). Full reference in
+// upstream example/default.kdl if needed.
+// web_server false
+// web_sharing "off"                       // "on" | "off" | "disabled"
+// web_server_cert "/path/to/cert.pem"
+// web_server_key "/path/to/key.pem"
+// enforce_https_for_localhost false
+// web_server_ip "127.0.0.1"
+// web_server_port 8082
+
+// Stack panes when resizing beyond a certain size (default: true).
+// Disabled because it was snapping focus to the bottom pane of a stack on
+// terminal resize. Re-enable if you want auto-stacking back.
+stacked_resize false
+
+show_startup_tips false
+
+// Whether to enable mouse hover effects and pane grouping functionality
+advanced_mouse_actions false

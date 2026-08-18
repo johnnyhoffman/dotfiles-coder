@@ -1,0 +1,79 @@
+// TILED
+
+swap_tiled_layout name="focal" {
+    tab max_panes=7 {
+        pane split_direction="vertical" {
+            pane size="70%"
+            pane size="30%" split_direction="horizontal" {
+                pane
+                pane
+                pane
+                pane
+            }
+        }
+    }
+    tab split_direction="vertical" max_panes=9 {
+        pane size="50%"
+        pane split_direction="horizontal" size="25%" {
+            pane
+            pane
+            pane
+        }
+        pane split_direction="horizontal" size="25%" {
+            pane
+            pane
+            pane
+        }
+    }
+    tab split_direction="vertical" max_panes=11 {
+        pane size="50%"
+        pane split_direction="horizontal" size="25%" {
+            pane
+            pane
+            pane
+            pane
+        }
+        pane split_direction="horizontal" size="25%" {
+            pane
+            pane
+            pane
+            pane
+        }
+    }
+    tab split_direction="vertical" max_panes=17 {
+        pane size="50%"
+        pane split_direction="horizontal" size="25%" {
+            pane
+            pane
+            pane
+            pane
+        }
+        pane size="25%" {
+            pane split_direction="horizontal" stacked=true size="50%" {
+                pane
+                pane
+                pane
+                pane
+                pane
+            }
+            pane split_direction="horizontal" stacked=true size="50%" {
+                pane
+                pane
+                pane
+                pane
+                pane
+            }
+        }
+    }
+}
+swap_tiled_layout name="stack" {
+    tab {
+        pane stacked=true {
+            pane
+        }
+    }
+}
+
+// FLOATING: no swap_floating_layout defined — Zellij uses its built-in
+// centered placement for floating panes. (Removed ~730 lines of hand-enumerated
+// float-large/float-small presets that went unused.)

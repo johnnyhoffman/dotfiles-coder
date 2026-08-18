@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+# Coder dotfiles entrypoint (run automatically by `coder dotfiles <repo>`).
+# Idempotent — re-run on every workspace build/rebuild.
+#
+# Everything is best-effort: a missing tool degrades the shell, it never
+# breaks the workspace build. Binaries land in ~/.local/bin (no sudo needed);
+# apt is used only when passwordless sudo happens to be available.
+set -uo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOCAL_BIN="$HOME/.local/bin"
+export PATH="$LOCAL_BIN:$HOME/.fzf/bin:$PATH"
+
+ARCH="$(uname -m)" # x86_64 | aarch64
+FAILED=()
+
+log()  { printf '\033[1;34m[dotfiles]\033[0m %s\n' "$*"; }
+warn() { printf '\033[1;33m[dotfiles]\033[0m %s\n' "$*" >&2; }
+have() { command -v "$1" >/dev/null 2>&1; }
+fail() { warn "$1 install failed"; FAILED+=("$1"); }
+
+# --- symlink home/ into ~ --------------------------------------------------
+# Top-level entries link directly; .config children link individually so the
+# workspace's own ~/.config contents survive. Pre-existing real files are
+# moved aside once to *.pre-dotfiles.
+link_entry() {
+    local src="$1" dst="$2"
+    if [ -e "$dst" ] && [ ! -L "$dst" ]; then
+        warn "moving existing $dst to $dst.pre-dotfiles"
+        mv "$dst" "$dst.pre-dotfiles"
+    fi
+    ln -sfn "$src" "$dst"
+}
+
+link_home() {
+    log "linking dotfiles into ~"
+    mkdir -p "$HOME/.config" "$HOME/.cache/zsh" "$LOCAL_BIN"
+    local entry sub
+    for entry in "$REPO/home"/.[!.]* "$REPO/home"/*; do
+        [ -e "$entry" ] || continue
+        if [ "$(basename "$entry")" = ".config" ]; then
+            for sub in "$entry"/* "$entry"/.[!.]*; do
+                [ -e "$sub" ] || continue
+                link_entry "$sub" "$HOME/.config/$(basename "$sub")"
+            done
+        else
+            link_entry "$entry" "$HOME/$(basename "$entry")"
+        fi
+    done
+}
+
+# --- package installs ------------------------------------------------------
+APT_READY=""
+apt_install() {
+    have apt-get || return 1
+    sudo -n true 2>/dev/null || return 1
+    if [ -z "$APT_READY" ]; then
+        sudo apt-get update -qq || true
+        APT_READY=1
+    fi
+    sudo apt-get install -y -qq "$@"
+}
+
+# Fetch a version-independent "latest" release asset and untar into a dir.
+fetch_tar() { # url dest-dir [tar-args...]
+    local url="$1" dest="$2"
+    shift 2
+    mkdir -p "$dest"
+    curl -fsSL --retry 3 --retry-all-errors "$url" | tar -xz -C "$dest" "$@"
+}
+
+install_nvim() {
+    # LazyVim needs >= 0.10; distro packages are often older, so prefer the
+    # official tarball even over an existing old nvim.
+    if have nvim && nvim --version | head -1 | grep -qE 'v(0\.[1-9][0-9]|[1-9])'; then
+        return
+    fi
+    log "installing neovim"
+    local narch="x86_64"
+    [ "$ARCH" = "aarch64" ] && narch="arm64"
+    rm -rf "$HOME/.local/opt/nvim-linux-$narch"
+    fetch_tar "https://github.com/neovim/neovim/releases/latest/download/nvim-linux-$narch.tar.gz" \
+        "$HOME/.local/opt" \
+        && ln -sfn "$HOME/.local/opt/nvim-linux-$narch/bin/nvim" "$LOCAL_BIN/nvim" \
+        || fail nvim
+}
+
+install_fzf() {
+    # Git-clone install: apt's fzf is too old for `fzf --zsh` (needs >= 0.48).
+    have fzf && return
+    log "installing fzf"
+    { [ -d "$HOME/.fzf" ] || git clone --depth 1 -q https://github.com/junegunn/fzf "$HOME/.fzf"; } \
+        && "$HOME/.fzf/install" --bin >/dev/null \
+        && ln -sfn "$HOME/.fzf/bin/fzf" "$LOCAL_BIN/fzf" \
+        || fail fzf
+}
+
+install_rg() {
+    have rg && return
+    log "installing ripgrep"
+    apt_install ripgrep && return
+    local url
+    url="$(curl -fsSL https://api.github.com/repos/BurntSushi/ripgrep/releases/latest \
+        | grep -oE "https://[^\"]*${ARCH}-unknown-linux-(musl|gnu)\.tar\.gz" | head -1)"
+    [ -n "$url" ] \
+        && curl -fsSL --retry 3 --retry-all-errors "$url" | tar -xz --wildcards --strip-components=1 -C "$LOCAL_BIN" '*/rg' \
+        || fail ripgrep
+}
+
+install_eza() {
+    have eza && return
+    log "installing eza"
+    fetch_tar "https://github.com/eza-community/eza/releases/latest/download/eza_${ARCH}-unknown-linux-gnu.tar.gz" \
+        "$LOCAL_BIN" || fail eza
+}
+
+install_zellij() {
+    have zellij && return
+    log "installing zellij"
+    fetch_tar "https://github.com/zellij-org/zellij/releases/latest/download/zellij-${ARCH}-unknown-linux-musl.tar.gz" \
+        "$LOCAL_BIN" || fail zellij
+}
+
+install_zoxide() {
+    have zoxide && return
+    log "installing zoxide"
+    curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh >/dev/null || fail zoxide
+}
+
+install_starship() {
+    have starship && return
+    log "installing starship"
+    curl -sSfL https://starship.rs/install.sh | sh -s -- -y -b "$LOCAL_BIN" >/dev/null || fail starship
+}
+
+install_mise() {
+    have mise && return
+    log "installing mise"
+    curl -fsSL https://mise.run | sh >/dev/null || fail mise
+}
+
+install_node() {
+    # Some nvim tooling (mason-installed LSPs, markdownlint) wants node.
+    have node && return
+    have mise || return 0
+    log "installing node (via mise)"
+    mise use -g -q node@lts || fail node
+}
+
+# --- default shell ---------------------------------------------------------
+ensure_zsh() {
+    have zsh || apt_install zsh || { fail zsh; return; }
+    # chsh is usually locked down in workspaces; the .bashrc guard covers it.
+    if [ "$(basename "${SHELL:-}")" != "zsh" ]; then
+        chsh -s "$(command -v zsh)" 2>/dev/null || true
+    fi
+    local marker="# dotfiles: hand interactive shells to zsh"
+    if ! grep -qF "$marker" "$HOME/.bashrc" 2>/dev/null; then
+        cat >>"$HOME/.bashrc" <<EOF
+
+$marker
+if [ -z "\${ZSH_VERSION:-}" ] && [ -t 1 ] && [ -z "\${NO_ZSH:-}" ] && command -v zsh >/dev/null 2>&1; then
+    exec zsh -l
+fi
+EOF
+    fi
+}
+
+# --- main ------------------------------------------------------------------
+if ! have curl && ! apt_install curl; then
+    warn "curl is unavailable — linking dotfiles only, skipping tool installs"
+    link_home
+    exit 0
+fi
+
+link_home
+apt_install build-essential unzip >/dev/null 2>&1 || true # treesitter/mason helpers
+ensure_zsh
+install_nvim
+install_fzf
+install_rg
+install_eza
+install_zellij
+install_zoxide
+install_starship
+install_mise
+install_node
+
+if [ "${#FAILED[@]}" -gt 0 ]; then
+    warn "finished with failures: ${FAILED[*]} (shell degrades gracefully; re-run $REPO/install.sh to retry)"
+else
+    log "done — open a new shell (zsh) and run nvim once to let plugins install"
+fi
