@@ -1,0 +1,14 @@
+{
+  "name": "global-eslint-config",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Global fallback ESLint flat config for TS/JS projects that have no config of their own. Stowed to ~/.config/eslint and injected by the Neovim eslint LSP via overrideConfigFile.",
+  "dependencies": {
+    "@eslint/js": "^9.39.4",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "eslint": "^9.39.4",
+    "globals": "^16.5.0",
+    "typescript-eslint": "^8.60.1"
+  }
+}

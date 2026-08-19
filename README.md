@@ -16,3 +16,7 @@ Coder clones the repo and runs `install.sh`, which symlinks `home/` into `~`, in
 
 - `install.sh` — Coder entrypoint
 - `home/` — mirrors `$HOME`; top-level entries and `.config/*` children are symlinked
+
+## Zellij
+
+Interactive shells auto-attach the `default` zellij session (set `ZJ_NO_AUTO=1` to opt out). Port forwarding is client-side: the personal dotfiles ship a `luma-port-forward` wrapper that keeps `coder port-forward` loops alive in a dedicated local zellij session.

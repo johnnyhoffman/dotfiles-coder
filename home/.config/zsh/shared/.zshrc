@@ -143,9 +143,10 @@ source ~/.config/zsh/shared/etc.sh
 # hive-tui Ghostty window sets this so its shells don't contaminate the
 # default zellij session; see ~/.config/aerospace/aerospace.toml).
 # $TERMUX_VERSION guard: never auto-spawn a multiplexer on the phone.
-# $ZJ_NO_AUTO: blanket opt-out — set by environments (e.g. the Coder work
-# overlay's os/etc.sh) that want `zj` available but never auto-attached.
-if [[ -z "$ZELLIJ" && -z "$ZJ_NO_AUTO" && -z "$HIVE_TUI_NO_ZELLIJ" && -z "$TERMUX_VERSION" ]] && command -v zellij &> /dev/null; then
+# $ZJ_NO_AUTO: blanket opt-out for environments that want `zj` available but
+# never auto-attached. -t 0: only attach on a real terminal (headless zsh -ic
+# invocations, CI, build hooks must never spawn a multiplexer).
+if [[ -t 0 && -z "$ZELLIJ" && -z "$ZJ_NO_AUTO" && -z "$HIVE_TUI_NO_ZELLIJ" && -z "$TERMUX_VERSION" ]] && command -v zellij &> /dev/null; then
     # this commented out version is the documented way to do it, which is a simple conditional script that checks to make sure it's not already in a zellij script (the same $ZELLIJ check as above) for $ZELLIJ_AUTO_ATTACH and $ZELLIJ_AUTO_EXIT support
     # eval "$(zellij setup --generate-auto-start zsh)"
     zj

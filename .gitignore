@@ -1,0 +1,3 @@
+# npm ci output from install.sh's eslint-deps step (the ~/.config/eslint
+# symlink points into this clone).
+home/.config/eslint/node_modules/

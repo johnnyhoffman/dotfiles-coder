@@ -124,19 +124,22 @@ install_zellij() {
 install_zoxide() {
     have zoxide && return
     log "installing zoxide"
-    curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh >/dev/null || fail zoxide
+    apt_install zoxide && return
+    curl -sSfL --retry 3 --retry-all-errors https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh >/dev/null || fail zoxide
 }
 
 install_starship() {
     have starship && return
     log "installing starship"
-    curl -sSfL https://starship.rs/install.sh | sh -s -- -y -b "$LOCAL_BIN" >/dev/null || fail starship
+    fetch_tar "https://github.com/starship/starship/releases/latest/download/starship-${ARCH}-unknown-linux-musl.tar.gz" \
+        "$LOCAL_BIN" && return
+    curl -sSfL --retry 3 --retry-all-errors https://starship.rs/install.sh | sh -s -- -y -b "$LOCAL_BIN" >/dev/null || fail starship
 }
 
 install_mise() {
     have mise && return
     log "installing mise"
-    curl -fsSL https://mise.run | sh >/dev/null || fail mise
+    curl -fsSL --retry 3 --retry-all-errors https://mise.run | sh >/dev/null || fail mise
 }
 
 install_node() {
@@ -145,6 +148,19 @@ install_node() {
     have mise || return 0
     log "installing node (via mise)"
     mise use -g -q node@lts || fail node
+}
+
+install_eslint_deps() {
+    # Global TS-style fallback: nvim points config-less projects at
+    # ~/.config/eslint, which needs its packages installed once.
+    [ -d "$HOME/.config/eslint" ] || return 0
+    [ -d "$HOME/.config/eslint/node_modules" ] && return 0
+    log "installing global eslint deps"
+    if have npm; then
+        (cd "$HOME/.config/eslint" && npm ci --silent) || fail eslint-deps
+    elif have mise; then
+        (cd "$HOME/.config/eslint" && mise x -- npm ci --silent) || fail eslint-deps
+    fi
 }
 
 # --- default shell ---------------------------------------------------------
@@ -185,6 +201,7 @@ install_zoxide
 install_starship
 install_mise
 install_node
+install_eslint_deps
 
 if [ "${#FAILED[@]}" -gt 0 ]; then
     warn "finished with failures: ${FAILED[*]} (shell degrades gracefully; re-run $REPO/install.sh to retry)"
