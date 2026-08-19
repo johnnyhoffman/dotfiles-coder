@@ -32,6 +32,31 @@ link_entry() {
     ln -sfn "$src" "$dst"
 }
 
+# nvim rewrites these during normal use (plugin updates, extras/news state).
+# They are copied instead of linked so that churn lands in $HOME, the repo
+# clone stays pristine, and re-running `coder dotfiles` pulls without
+# conflicts. Re-running install.sh resets them to the repo's state.
+NVIM_COPY_FILES="lazy-lock.json lazyvim.json"
+
+link_nvim() {
+    local src="$1" dst="$HOME/.config/nvim" sub name
+    if [ -L "$dst" ]; then rm -f "$dst"; fi # migrate from older wholesale link
+    mkdir -p "$dst"
+    for sub in "$src"/* "$src"/.[!.]*; do
+        [ -e "$sub" ] || continue
+        name="$(basename "$sub")"
+        case " $NVIM_COPY_FILES " in
+            *" $name "*)
+                rm -f "$dst/$name"
+                cp "$sub" "$dst/$name"
+                ;;
+            *)
+                link_entry "$sub" "$dst/$name"
+                ;;
+        esac
+    done
+}
+
 link_home() {
     log "linking dotfiles into ~"
     mkdir -p "$HOME/.cache/zsh" "$LOCAL_BIN"
@@ -46,7 +71,11 @@ link_home() {
                 mkdir -p "$HOME/$name"
                 for sub in "$entry"/* "$entry"/.[!.]*; do
                     [ -e "$sub" ] || continue
-                    link_entry "$sub" "$HOME/$name/$(basename "$sub")"
+                    if [ "$name" = ".config" ] && [ "$(basename "$sub")" = "nvim" ]; then
+                        link_nvim "$sub"
+                    else
+                        link_entry "$sub" "$HOME/$name/$(basename "$sub")"
+                    fi
                 done
                 ;;
             *)
@@ -157,6 +186,20 @@ install_node() {
     mise use -g -q node@lts || fail node
 }
 
+run_capped() { # guard against a hung download stalling the workspace build
+    if have timeout; then timeout 1500 "$@"; else "$@"; fi
+}
+
+install_nvim_plugins() {
+    have nvim || return 0
+    # mason packages need node/npm; mise-provided node lives behind shims
+    [ -d "$HOME/.local/share/mise/shims" ] && export PATH="$HOME/.local/share/mise/shims:$PATH"
+    log "installing nvim plugins (Lazy restore, pinned by lazy-lock.json)"
+    run_capped nvim --headless "+Lazy! restore" +qa >/dev/null 2>&1 || fail nvim-plugins
+    log "pre-installing mason packages (LSPs, linters, formatters — takes a while)"
+    run_capped nvim --headless "+luafile $REPO/nvim-provision.lua" +qa || fail mason-packages
+}
+
 install_eslint_deps() {
     # Global TS-style fallback: nvim points config-less projects at
     # ~/.config/eslint, which needs its packages installed once.
@@ -213,7 +256,7 @@ if ! have curl && ! apt_install curl; then
 fi
 
 link_home
-apt_install build-essential unzip >/dev/null 2>&1 || true # treesitter/mason helpers
+apt_install build-essential unzip python3 python3-venv >/dev/null 2>&1 || true # treesitter/mason helpers (python3: mason's pip packages)
 ensure_zsh
 install_nvim
 install_fzf
@@ -225,6 +268,7 @@ install_starship
 install_mise
 install_node
 install_eslint_deps
+install_nvim_plugins
 
 if [ "${#FAILED[@]}" -gt 0 ]; then
     warn "finished with failures: ${FAILED[*]} (shell degrades gracefully; re-run $REPO/install.sh to retry)"
