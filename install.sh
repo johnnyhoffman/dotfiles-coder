@@ -34,18 +34,25 @@ link_entry() {
 
 link_home() {
     log "linking dotfiles into ~"
-    mkdir -p "$HOME/.config" "$HOME/.cache/zsh" "$LOCAL_BIN"
-    local entry sub
+    mkdir -p "$HOME/.cache/zsh" "$LOCAL_BIN"
+    local entry sub name
     for entry in "$REPO/home"/.[!.]* "$REPO/home"/*; do
         [ -e "$entry" ] || continue
-        if [ "$(basename "$entry")" = ".config" ]; then
-            for sub in "$entry"/* "$entry"/.[!.]*; do
-                [ -e "$sub" ] || continue
-                link_entry "$sub" "$HOME/.config/$(basename "$sub")"
-            done
-        else
-            link_entry "$entry" "$HOME/$(basename "$entry")"
-        fi
+        name="$(basename "$entry")"
+        case "$name" in
+            # Dirs the workspace itself writes into (.config by other tools,
+            # .claude by Claude Code's state) — link children, never the dir.
+            .config | .claude)
+                mkdir -p "$HOME/$name"
+                for sub in "$entry"/* "$entry"/.[!.]*; do
+                    [ -e "$sub" ] || continue
+                    link_entry "$sub" "$HOME/$name/$(basename "$sub")"
+                done
+                ;;
+            *)
+                link_entry "$entry" "$HOME/$name"
+                ;;
+        esac
     done
 }
 

@@ -3,3 +3,6 @@
 
 *~
 .DS_Store
+
+# Planning docs (planning-docs skill) stay untracked at work.
+.planning/
