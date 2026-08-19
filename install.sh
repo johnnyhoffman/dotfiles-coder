@@ -180,6 +180,22 @@ if [ -z "\${ZSH_VERSION:-}" ] && [ -t 1 ] && [ -z "\${NO_ZSH:-}" ] && command -v
 fi
 EOF
     fi
+    # Coder's SSH sessions start bash as a *login* shell, which reads
+    # ~/.bash_profile / ~/.bash_login / ~/.profile — never ~/.bashrc — so the
+    # guard above only fires if the profile chain sources .bashrc. Ensure the
+    # file bash actually picks (first existing, .bash_profile if none) does.
+    local profile
+    for profile in "$HOME/.bash_profile" "$HOME/.bash_login" "$HOME/.profile"; do
+        [ -f "$profile" ] && break
+    done
+    [ -f "$profile" ] || profile="$HOME/.bash_profile"
+    if ! grep -q '\.bashrc' "$profile" 2>/dev/null; then
+        cat >>"$profile" <<'EOF'
+
+# dotfiles: login shells read .bashrc (where the zsh handoff lives)
+[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"
+EOF
+    fi
 }
 
 # --- main ------------------------------------------------------------------
