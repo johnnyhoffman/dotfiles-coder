@@ -21,4 +21,4 @@ Coder clones the repo and runs `install.sh`, which symlinks `home/` into `~`, in
 
 ## Zellij
 
-Interactive shells auto-attach the `default` zellij session (set `ZJ_NO_AUTO=1` to opt out). Port forwarding is client-side: the personal dotfiles ship a `luma-port-forward` wrapper that keeps `coder port-forward` loops alive in a dedicated local zellij session.
+Interactive shells auto-attach the `default` zellij session (set `ZJ_NO_AUTO=1` to opt out). Port forwarding is client-side: the personal dotfiles ship a `luma-coder-port-forward` wrapper that keeps `coder port-forward` loops alive in a dedicated local zellij session.
