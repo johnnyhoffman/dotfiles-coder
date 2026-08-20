@@ -63,7 +63,8 @@ link_nvim() {
 # wholesale link from an older install is unwound and the skills it
 # shadowed into skills.pre-dotfiles are restored first.
 link_claude_skills() {
-    local src="$1" dst="$HOME/.claude/skills" sub
+    local src="$1" dst="$HOME/.claude/skills" sub name
+    local exclude="$HOME/.claude/.git/info/exclude"
     if [ -L "$dst" ]; then
         rm -f "$dst"
         [ -d "$dst.pre-dotfiles" ] && mv "$dst.pre-dotfiles" "$dst"
@@ -71,7 +72,17 @@ link_claude_skills() {
     mkdir -p "$dst"
     for sub in "$src"/* "$src"/.[!.]*; do
         [ -e "$sub" ] || continue
-        link_entry "$sub" "$dst/$(basename "$sub")"
+        name="$(basename "$sub")"
+        link_entry "$sub" "$dst/$name"
+        # ~/.claude may itself be a git tree (workspace provisioning manages
+        # it as one); these host-specific symlinks must never be committed
+        # there, so register them in the local-only exclude file rather than
+        # the tracked .gitignore.
+        if [ -d "$HOME/.claude/.git" ]; then
+            mkdir -p "${exclude%/*}"
+            grep -qxF "skills/$name" "$exclude" 2>/dev/null \
+                || echo "skills/$name" >>"$exclude"
+        fi
     done
 }
 
