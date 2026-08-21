@@ -261,9 +261,13 @@ ensure_git_name() {
 # --- default shell ---------------------------------------------------------
 ensure_zsh() {
     have zsh || apt_install zsh || { fail zsh; return; }
-    # chsh is usually locked down in workspaces; the .bashrc guard covers it.
+    # chsh authenticates through PAM: the password prompt goes to stderr and
+    # the read blocks on the tty, so under 2>/dev/null it is a silent hang
+    # until someone hits Enter. Keep it off stdin entirely, and only try the
+    # passwordless path — as root, /etc/pam.d/chsh short-circuits on
+    # pam_rootok; where sudo is locked down the .bashrc handoff below covers it.
     if [ "$(basename "${SHELL:-}")" != "zsh" ]; then
-        chsh -s "$(command -v zsh)" 2>/dev/null || true
+        sudo -n chsh -s "$(command -v zsh)" "$(id -un)" </dev/null >/dev/null 2>&1 || true
     fi
     local marker="# dotfiles: hand interactive shells to zsh"
     if ! grep -qF "$marker" "$HOME/.bashrc" 2>/dev/null; then
