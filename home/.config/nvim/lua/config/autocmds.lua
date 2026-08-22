@@ -173,3 +173,20 @@ vim.api.nvim_create_autocmd("FileType", {
         end, { buffer = ev.buf, desc = "Diff commit (side-by-side)" })
     end,
 })
+
+-- Hand Neovim's final cwd back to the shell on exit. A child process can't move
+-- its parent's shell, so the zsh `nvim` wrapper (zsh/shared/aliases.sh) passes a
+-- temp file via $NVIM_CWD_FILE and cds to whatever we write into it. Point of
+-- this: neogit's worktree popup (`w` from the status buffer) calls
+-- nvim_set_current_dir on the worktree it checks out or visits, and this makes
+-- that stick after you quit.
+-- getcwd(-1, -1) is the global cwd, ignoring any tab/window-local :lcd.
+vim.api.nvim_create_autocmd("VimLeavePre", {
+    group = vim.api.nvim_create_augroup("shell_cwd_handoff", { clear = true }),
+    callback = function()
+        local out = vim.env.NVIM_CWD_FILE
+        if out and out ~= "" then
+            pcall(vim.fn.writefile, { vim.fn.getcwd(-1, -1) }, out)
+        end
+    end,
+})

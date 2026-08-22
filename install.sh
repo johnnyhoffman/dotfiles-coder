@@ -245,17 +245,22 @@ install_eslint_deps() {
 }
 
 # --- git identity ----------------------------------------------------------
-ensure_git_name() {
-    # The workspace's admin setup injects ~/.gitconfig with the work email,
-    # which must stay authoritative (and out of this repo) — so no identity
-    # dotfile. Fill in the missing user.name there instead, targeting
+ensure_git_identity() {
+    # The workspace's admin setup owns the work email, which must stay out of
+    # this repo — so no identity dotfile. Fill in whatever is missing in
+    # ~/.gitconfig instead (email from the template-provided env), targeting
     # ~/.gitconfig explicitly: ~/.config/git/config is also "global" scope
     # but is a symlink into this repo's clone, and a write landing there
     # would dirty the clone.
     have git || return 0
-    [ -n "$(git config --global user.name 2>/dev/null)" ] && return 0
-    log "setting git user.name"
-    git config --file "$HOME/.gitconfig" user.name "Johnny Hoffman"
+    if [ -z "$(git config --global user.name 2>/dev/null)" ]; then
+        log "setting git user.name"
+        git config --file "$HOME/.gitconfig" user.name "Johnny Hoffman"
+    fi
+    if [ -z "$(git config --global user.email 2>/dev/null)" ] && [ -n "${CODER_USER_EMAIL:-}" ]; then
+        log "setting git user.email"
+        git config --file "$HOME/.gitconfig" user.email "$CODER_USER_EMAIL"
+    fi
 }
 
 # --- default shell ---------------------------------------------------------
@@ -305,7 +310,7 @@ if ! have curl && ! apt_install curl; then
 fi
 
 link_home
-ensure_git_name
+ensure_git_identity
 apt_install build-essential unzip python3 python3-venv >/dev/null 2>&1 || true # treesitter/mason helpers (python3: mason's pip packages)
 ensure_zsh
 install_nvim

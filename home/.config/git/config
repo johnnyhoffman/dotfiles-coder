@@ -1,7 +1,8 @@
 # Coder workspace git config: the generic settings shared by the personal
 # hosts' configs, minus identity and credential helpers. Work identity comes
 # from the Coder template's env/injected ~/.gitconfig (which wins over this
-# XDG file on conflicts); install.sh fills in user.name there if missing.
+# XDG file on conflicts); install.sh fills in missing identity there
+# (user.name hardcoded, user.email from $CODER_USER_EMAIL).
 [pull]
 	rebase = true
 [init]
