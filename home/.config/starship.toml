@@ -35,7 +35,7 @@ format = '[](fg:surface0)[$symbol $output]($style)[](fg:surface0)'
 
 # Replace the '❯' symbol in the prompt with ''
 [character] # The name of the module we are configuring is 'character'
-success_symbol = '[](fg:#f000000'
+success_symbol = '[](fg:#000000)'
 error_symbol = '[](fg:red)'
 vimcmd_symbol = '[](fg:text)'
 vimcmd_replace_one_symbol = '[](fg:sky)'
