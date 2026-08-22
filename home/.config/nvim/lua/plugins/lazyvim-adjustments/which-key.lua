@@ -22,10 +22,6 @@ return {
                 -- valid colors are: `azure`, `blue`, `cyan`, `green`, `grey`, `orange`, `purple`, `red`, `yellow`, but I'm mostly opting for emojis so color is not applicable
                 -- { "<leader>a", group = "+ai", icon = { icon = "󰧑", color = "red" } },
                 { "<leader>a", group = "ai", icon = { icon = "🧠" } },
-                { "<leader>am", group = "minuet model/preset" },
-
-                { "<leader>o", group = "obsidian", icon = { icon = "📝" } },
-                { "<leader>ot", group = "task view" },
                 { "<leader>e", group = "etc.", icon = { icon = "", color = "red" } },
                 { "<leader>se", group = "etc.", icon = { icon = "", color = "red" } },
                 { "<leader>et", group = "toggle" },

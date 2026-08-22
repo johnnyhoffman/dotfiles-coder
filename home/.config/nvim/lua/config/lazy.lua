@@ -14,10 +14,6 @@ if not (vim.uv or vim.loop).fs_stat(lazypath) then
 end
 vim.opt.rtp:prepend(lazypath)
 
--- Mobile gate: on Termux (markdown-editing phone) a single flag lets
--- plugins/added/mobile.lua disable the dev-heavy stack (mason, LSPs, DAP,
--- tests) while sharing this exact config. Set before specs are evaluated.
-vim.g.mobile = vim.env.TERMUX_VERSION ~= nil
 
 -- LazyVim ejected - add local clone to Lua path so lazyvim modules are found
 local lazyvim_clone = vim.fn.stdpath("config") .. "/lua/LazyVim-clone"

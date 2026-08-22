@@ -11,13 +11,6 @@
 -- client attaches, otherwise the first begin/report events are lost.
 require("scripts.lsp-progress")
 
--- Personal-machine-only autocmds (j-* tooling, Obsidian vault stack) — the
--- module is absent on work machines, where the generated dotfiles (coder/)
--- exclude it. Only a missing module is tolerated; real errors still surface.
-local ok, err = pcall(require, "config.personal")
-if not ok and not tostring(err):match("module 'config%.personal' not found") then
-    vim.notify("config.personal failed to load: " .. tostring(err), vim.log.levels.ERROR)
-end
 
 -- Disable wrapping for Zellij pane dumps (*.dump files).
 vim.api.nvim_create_autocmd({ "BufRead", "BufNewFile" }, {
