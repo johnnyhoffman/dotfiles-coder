@@ -15,27 +15,27 @@ $character
 add_newline = false
 
 [directory]
-style = "bg:peach fg:surface0"
-format = "[](fg:peach)[$path]($style)[](fg:peach)"
+style = "bg:surface0 fg:#f6c344"
+format = "[](fg:surface0)[$path]($style)[](fg:surface0)"
 truncation_length = 1
 truncation_symbol = "… /"
 
 [git_branch]
 symbol = ""
-style = "bg:subtext1 fg:surface0"
-format = '[](fg:subtext1)[$symbol $branch]($style)[](fg:subtext1)'
+style = "bg:surface0 fg:subtext1"
+format = '[](fg:surface0)[$symbol $branch]($style)[](fg:surface0)'
 
 # Shown only inside a linked git worktree (git-dir diverges from git-common-dir there)
 [custom.worktree]
 when = 'test "$(git rev-parse --git-dir 2>/dev/null)" != "$(git rev-parse --git-common-dir 2>/dev/null)"'
 command = 'basename "$(git rev-parse --show-toplevel)"'
 symbol = ""
-style = "bg:peach fg:surface0"
-format = '[](fg:peach)[$symbol $output]($style)[](fg:peach)'
+style = "bg:surface0 fg:peach"
+format = '[](fg:surface0)[$symbol $output]($style)[](fg:surface0)'
 
 # Replace the '❯' symbol in the prompt with ''
 [character] # The name of the module we are configuring is 'character'
-success_symbol = '[](fg:peach)'
+success_symbol = '[](fg:#f6c344)'
 error_symbol = '[](fg:red)'
 vimcmd_symbol = '[](fg:text)'
 vimcmd_replace_one_symbol = '[](fg:sky)'
