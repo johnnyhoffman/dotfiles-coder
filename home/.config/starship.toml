@@ -15,7 +15,7 @@ $character
 add_newline = false
 
 [directory]
-style = "bg:surface0 fg:#overlay0"
+style = "bg:surface0 fg:overlay0"
 format = "[](fg:surface0)[$path]($style)[](fg:surface0)"
 truncation_length = 1
 truncation_symbol = "… /"
