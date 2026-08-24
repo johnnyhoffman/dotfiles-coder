@@ -65,13 +65,13 @@ link_home() {
         [ -e "$entry" ] || continue
         name="$(basename "$entry")"
         case "$name" in
-            # Dirs the workspace itself writes into (.config by other tools,
-            # .claude by Claude Code's state) — link children, never the dir.
-            .config | .claude)
+            # The workspace's other tools write into ~/.config too — link
+            # children, never the dir.
+            .config)
                 mkdir -p "$HOME/$name"
                 for sub in "$entry"/* "$entry"/.[!.]*; do
                     [ -e "$sub" ] || continue
-                    if [ "$name" = ".config" ] && [ "$(basename "$sub")" = "nvim" ]; then
+                    if [ "$(basename "$sub")" = "nvim" ]; then
                         link_nvim "$sub"
                     else
                         link_entry "$sub" "$HOME/$name/$(basename "$sub")"
@@ -213,12 +213,35 @@ install_eslint_deps() {
     fi
 }
 
+# --- git identity ----------------------------------------------------------
+ensure_git_identity() {
+    # The workspace's admin setup owns the work email, which must stay out of
+    # this repo — so no identity dotfile. Fill in whatever is missing in
+    # ~/.gitconfig instead (email from the template-provided env), targeting
+    # ~/.gitconfig explicitly: ~/.config/git/config is also "global" scope
+    # but is a symlink into this repo's clone, and a write landing there
+    # would dirty the clone.
+    have git || return 0
+    if [ -z "$(git config --global user.name 2>/dev/null)" ]; then
+        log "setting git user.name"
+        git config --file "$HOME/.gitconfig" user.name "Johnny Hoffman"
+    fi
+    if [ -z "$(git config --global user.email 2>/dev/null)" ] && [ -n "${CODER_USER_EMAIL:-}" ]; then
+        log "setting git user.email"
+        git config --file "$HOME/.gitconfig" user.email "$CODER_USER_EMAIL"
+    fi
+}
+
 # --- default shell ---------------------------------------------------------
 ensure_zsh() {
     have zsh || apt_install zsh || { fail zsh; return; }
-    # chsh is usually locked down in workspaces; the .bashrc guard covers it.
+    # chsh authenticates through PAM: the password prompt goes to stderr and
+    # the read blocks on the tty, so under 2>/dev/null it is a silent hang
+    # until someone hits Enter. Keep it off stdin entirely, and only try the
+    # passwordless path — as root, /etc/pam.d/chsh short-circuits on
+    # pam_rootok; where sudo is locked down the .bashrc handoff below covers it.
     if [ "$(basename "${SHELL:-}")" != "zsh" ]; then
-        chsh -s "$(command -v zsh)" 2>/dev/null || true
+        sudo -n chsh -s "$(command -v zsh)" "$(id -un)" </dev/null >/dev/null 2>&1 || true
     fi
     local marker="# dotfiles: hand interactive shells to zsh"
     if ! grep -qF "$marker" "$HOME/.bashrc" 2>/dev/null; then
@@ -256,6 +279,7 @@ if ! have curl && ! apt_install curl; then
 fi
 
 link_home
+ensure_git_identity
 apt_install build-essential unzip python3 python3-venv >/dev/null 2>&1 || true # treesitter/mason helpers (python3: mason's pip packages)
 ensure_zsh
 install_nvim

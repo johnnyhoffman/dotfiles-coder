@@ -1,7 +1,6 @@
--- minuet (AI completion) is disabled on mobile/Termux, and its spec file is
--- excluded entirely from the generated work dotfiles (coder/). Gate every
--- reference to it on availability — otherwise entering insert mode errors
--- when blink tries to activate a source whose module can't be loaded.
+-- Gate every reference to minuet (AI completion) on the spec file's presence:
+-- it is absent from some builds, and entering insert mode errors when blink
+-- tries to activate a source whose module can't be loaded.
 local has_minuet = not vim.g.mobile
     and vim.uv.fs_stat(vim.fn.stdpath("config") .. "/lua/plugins/added/minuet-ai.lua") ~= nil
 
