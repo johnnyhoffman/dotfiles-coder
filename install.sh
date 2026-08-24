@@ -57,6 +57,35 @@ link_nvim() {
     done
 }
 
+# Workspace provisioning (lumalabs-skills workspace-init) writes its own
+# skills (coder, coder-up, ...) into ~/.claude/skills, so linking the dir
+# wholesale would shadow them. Link each skill individually instead; a
+# wholesale link from an older install is unwound and the skills it
+# shadowed into skills.pre-dotfiles are restored first.
+link_claude_skills() {
+    local src="$1" dst="$HOME/.claude/skills" sub name
+    local exclude="$HOME/.claude/.git/info/exclude"
+    if [ -L "$dst" ]; then
+        rm -f "$dst"
+        [ -d "$dst.pre-dotfiles" ] && mv "$dst.pre-dotfiles" "$dst"
+    fi
+    mkdir -p "$dst"
+    for sub in "$src"/* "$src"/.[!.]*; do
+        [ -e "$sub" ] || continue
+        name="$(basename "$sub")"
+        link_entry "$sub" "$dst/$name"
+        # ~/.claude may itself be a git tree (workspace provisioning manages
+        # it as one); these host-specific symlinks must never be committed
+        # there, so register them in the local-only exclude file rather than
+        # the tracked .gitignore.
+        if [ -d "$HOME/.claude/.git" ]; then
+            mkdir -p "${exclude%/*}"
+            grep -qxF "skills/$name" "$exclude" 2>/dev/null \
+                || echo "skills/$name" >>"$exclude"
+        fi
+    done
+}
+
 link_home() {
     log "linking dotfiles into ~"
     mkdir -p "$HOME/.cache/zsh" "$LOCAL_BIN"
@@ -73,6 +102,8 @@ link_home() {
                     [ -e "$sub" ] || continue
                     if [ "$(basename "$sub")" = "nvim" ]; then
                         link_nvim "$sub"
+                    elif [ "$name" = ".claude" ] && [ "$(basename "$sub")" = "skills" ]; then
+                        link_claude_skills "$sub"
                     else
                         link_entry "$sub" "$HOME/$name/$(basename "$sub")"
                     fi
