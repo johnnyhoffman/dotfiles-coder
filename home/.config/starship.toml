@@ -15,7 +15,7 @@ $character
 add_newline = false
 
 [directory]
-style = "bg:surface0 fg:subtext1"
+style = "bg:surface0 fg:#000000"
 format = "[](fg:surface0)[$path]($style)[](fg:surface0)"
 truncation_length = 1
 truncation_symbol = "… /"
