@@ -94,6 +94,10 @@ command -v rg &> /dev/null && source <(rg --generate complete-zsh)
 [[ -f "$HOME/.claude/settings-aux.json" ]] \
     && alias claude='claude --settings ~/.claude/settings-aux.json'
 
+# Same layering for the shell itself: a connecting client may drop personal
+# additions (aliases, etc.) into this untracked aux rc.
+[[ -f "$HOME/.zshrc-aux" ]] && source "$HOME/.zshrc-aux"
+
 # Auto-attach the "default" zellij session. ZJ_NO_AUTO=1 opts out; the `-t 0`
 # test keeps headless `zsh -ic` invocations (build hooks, CI) from spawning a
 # multiplexer.
