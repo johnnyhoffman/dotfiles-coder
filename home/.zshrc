@@ -88,6 +88,12 @@ fi
 command -v fzf &> /dev/null && source <(fzf --zsh)
 command -v rg &> /dev/null && source <(rg --generate complete-zsh)
 
+# Extra Claude Code settings kept out of the tracked ~/.claude/settings.json:
+# a connecting client may drop personal additions (hooks, etc.) into this
+# untracked aux file; the alias layers it onto every interactive launch.
+[[ -f "$HOME/.claude/settings-aux.json" ]] \
+    && alias claude='claude --settings ~/.claude/settings-aux.json'
+
 # Auto-attach the "default" zellij session. ZJ_NO_AUTO=1 opts out; the `-t 0`
 # test keeps headless `zsh -ic` invocations (build hooks, CI) from spawning a
 # multiplexer.
