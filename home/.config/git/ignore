@@ -6,3 +6,6 @@
 
 # Planning docs stay untracked at work.
 .planning/
+
+# Playwright MCP output.
+.playwright-mcp/
