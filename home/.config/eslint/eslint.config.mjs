@@ -5,8 +5,7 @@
 // lua/plugins/lazyvim-adjustments/eslint.lua, which only points the LSP at this
 // file when the project lacks one.
 //
-// Rule choices mirror .planning/global-ts-style/checklist.md (sections C1/C2),
-// plus ESLint Stylistic handles TS/JS *formatting* (the role Prettier plays for
+// ESLint Stylistic handles TS/JS *formatting* (the role Prettier plays for
 // other filetypes) — chosen because Stylistic preserves authored layout instead
 // of reflowing everything the way Prettier does.
 

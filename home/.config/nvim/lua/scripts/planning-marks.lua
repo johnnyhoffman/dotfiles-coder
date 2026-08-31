@@ -1,5 +1,6 @@
--- "Open" planning-doc checkbox marks — the custom glyphs used in `.planning/*.md`
--- status docs (see the planning-docs skill) — treated as pseudo-TODOs and folded
+-- "Open" planning-doc checkbox marks — the custom glyphs used in planning status
+-- docs (`~/.claude/j-threads/**/*.md`, formerly repo-local `.planning/`; see the
+-- j-thread skill) — treated as pseudo-TODOs and folded
 -- into the existing todo workflow: `]t`/`[t` navigation and the `<leader>xt`/`xT`
 -- Trouble list (mode `todo_marks`) surface both these marks and real TODO/FIX/FIXME
 -- comments. Marks aren't todo-comments keywords (they're bracket glyphs, not words),
