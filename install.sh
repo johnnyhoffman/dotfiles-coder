@@ -186,6 +186,32 @@ install_node() {
     mise use -g -q node@lts || fail node
 }
 
+install_magick() {
+    # ImageMagick scales the PNGs snacks.image places (nvim's mermaid image
+    # renders). snacks accepts IM6's `convert` too, so apt's package is fine.
+    # Without sudo, the official AppImage (x86_64 only) is extracted — no FUSE
+    # needed — and its AppRun stands in for `magick`.
+    have magick || have convert && return
+    log "installing imagemagick"
+    apt_install imagemagick && return
+    if [ "$ARCH" != "x86_64" ]; then
+        warn "no ImageMagick build for $ARCH without apt; nvim's mermaid image float will not work"
+        fail imagemagick
+        return
+    fi
+    local url dest="$HOME/.local/opt/magick"
+    url="$(curl -fsSL https://api.github.com/repos/ImageMagick/ImageMagick/releases/latest \
+        | grep -oE 'https://[^"]*-gcc-x86_64\.AppImage' | head -1)"
+    [ -n "$url" ] \
+        && rm -rf "$dest" && mkdir -p "$dest" \
+        && curl -fsSL --retry 3 --retry-all-errors -o "$dest/magick.AppImage" "$url" \
+        && chmod +x "$dest/magick.AppImage" \
+        && (cd "$dest" && ./magick.AppImage --appimage-extract >/dev/null) \
+        && rm -f "$dest/magick.AppImage" \
+        && ln -sfn "$dest/squashfs-root/AppRun" "$LOCAL_BIN/magick" \
+        || fail imagemagick
+}
+
 install_mmdr() {
     # Mermaid → PNG for nvim's image renders (config/mermaid.lua): pure Rust,
     # no browser. The release tarball is just the binary.
@@ -302,7 +328,7 @@ fi
 
 link_home
 ensure_git_identity
-apt_install build-essential unzip python3 python3-venv imagemagick >/dev/null 2>&1 || true # treesitter/mason helpers (python3: mason's pip packages, termaid's venv); imagemagick: nvim's mermaid image renders
+apt_install build-essential unzip python3 python3-venv >/dev/null 2>&1 || true # treesitter/mason helpers (python3: mason's pip packages, termaid's venv)
 ensure_zsh
 install_nvim
 install_fzf
@@ -313,6 +339,7 @@ install_zoxide
 install_starship
 install_mise
 install_node
+install_magick
 install_mmdr
 install_termaid
 install_eslint_deps

@@ -22,7 +22,7 @@ Coder clones the repo and runs `install.sh`, which symlinks `home/` into `~`, in
 
 ## Mermaid
 
-```mermaid fences in markdown render inside nvim: `<localleader>mm` / `mi` draw the diagram as an image (float / inline) through `mmdr`, `<localleader>mM` / `mI` as coloured Unicode text through `termaid`. `install.sh` fetches both into `~/.local/bin`; the image path also needs ImageMagick (installed via apt when passwordless sudo exists) and a kitty-graphics terminal on your side of the SSH session (Ghostty, kitty). Inline images additionally need unicode placeholders, which Zellij doesn't pass yet, so use the float there.
+```mermaid fences in markdown render inside nvim: `<localleader>mm` / `mi` draw the diagram as an image (float / inline) through `mmdr`, `<localleader>mM` / `mI` as coloured Unicode text through `termaid`. `install.sh` fetches both into `~/.local/bin` and provides ImageMagick for the image path (apt when passwordless sudo exists, otherwise the official AppImage extracted into `~/.local/opt/magick`; x86_64 only), which also needs a kitty-graphics terminal on your side of the SSH session (Ghostty, kitty). Inline images additionally need unicode placeholders, which Zellij doesn't pass yet, so use the float there.
 
 ## Zellij
 
