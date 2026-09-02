@@ -7,13 +7,13 @@
 --     float or virtual lines below the fence, ANSI colours translated to
 --     highlight groups. Works wherever the CLI runs — Termux and SSH included.
 --   * image (lowercase keys) — render the fence to a PNG with a second CLI
---     (`mmdr`, pure Rust, no browser; `M.opts.image_cmd` is the whole coupling
---     and mermaid-cli slots in the same way), themed from the colorscheme, then
---     hand the PNG to snacks.image's placement API. snacks' own automatic doc
---     modes are switched off in lazyvim-adjustments/snacks.lua so nothing pops
---     up on its own. The float works in any kitty-graphics terminal (Zellij
---     included); inline needs unicode placeholders, so bare Ghostty only until
---     Zellij ships them.
+--     (`M.opts.image_cmds`, first on PATH wins: mermaidx, the real mermaid.js
+--     in an embedded JS engine, else the pure-Rust mmdr; no browser either
+--     way), themed from the colorscheme, then hand the PNG to snacks.image's
+--     placement API. snacks' own automatic doc modes are switched off in
+--     lazyvim-adjustments/snacks.lua so nothing pops up on its own. The float
+--     works in any kitty-graphics terminal (Zellij included); inline needs
+--     unicode placeholders, so bare Ghostty only until Zellij ships them.
 
 local api = vim.api
 
@@ -36,15 +36,25 @@ M.opts = {
     -- classDef fills. `termaid --themes` lists them all. Tag nodes with
     -- `:::name` or one `class X name` per line — 0.8 ignores `class A,B name`.
     text_theme = { dark = "default", light = "terra" },
-    -- Image renderer: must write a PNG to `{file}` from the mermaid file `{src}`.
-    -- `{config}` is a mermaid config JSON whose themeVariables come from the
-    -- colorscheme (image_theme below), so diagrams match the editor in light
-    -- and dark. mermaid-cli takes the same shape if fidelity ever matters more
-    -- than avoiding Chromium: { "mmdc", "-i", "{src}", "-o", "{file}", "-c", "{config}", "-s", "2" }
-    image_cmd = { "mmdr", "-i", "{src}", "-o", "{file}", "-e", "png", "-c", "{config}" },
-    -- Appended to image_cmd when a canvas size in pixels is wanted (the float
-    -- renders at the size of its box, so the drawing is scaled up to fill it
-    -- and centred by the renderer). Same flags for mmdr and mermaid-cli.
+    -- Image renderers, first one on PATH wins. Each must write a PNG to
+    -- `{file}` from the mermaid file `{src}`. `{theme}` is mermaid's built-in
+    -- base theme for the current 'background' (dark / default), `{config}` a
+    -- mermaid config JSON whose themeVariables come from the colorscheme
+    -- (image_theme below) and override the base, `{background}` the editor
+    -- background. mermaid-cli takes the same shape if ever wanted:
+    -- { "mmdc", "-i", "{src}", "-o", "{file}", "-t", "{theme}", "-c", "{config}", "-b", "{background}", "-s", "2" }
+    image_cmds = {
+        -- the real mermaid.js in an embedded JS engine (QuickJS + resvg), no
+        -- browser: full syntax, kanban / mindmap palettes; about a second on
+        -- a first render, cached after that
+        { "mermaidx", "-q", "-i", "{src}", "-o", "{file}", "-t", "{theme}", "-c", "{config}", "-b", "{background}" },
+        -- pure-Rust reimplementation: milliseconds, but uniform kanban columns
+        -- and stricter parsing
+        { "mmdr", "-i", "{src}", "-o", "{file}", "-e", "png", "-t", "{theme}", "-c", "{config}" },
+    },
+    -- Appended when a canvas size in pixels is wanted (the float asks for the
+    -- size of its box, so the drawing is scaled up to fit it). Same flags for
+    -- all of the renderers above.
     image_size = { "-w", "{width}", "-H", "{height}" },
 }
 
@@ -556,6 +566,10 @@ local function image_theme()
             titleColor = fg,
             lineColor = fg,
             edgeLabelBackground = bg,
+            -- flowchart subgraphs and kanban columns (mmdr draws those as
+            -- clusters, uniformly — no per-column palette like mermaid.js)
+            clusterBkg = box2,
+            clusterBorder = accent,
             -- sequence
             actorBkg = box,
             actorBorder = accent,
@@ -603,18 +617,36 @@ end
 ---@field width integer canvas width in pixels
 ---@field height integer canvas height in pixels
 
+--- The first image renderer preset whose binary is on PATH, or nil.
+local function image_cmd()
+    for _, preset in ipairs(M.opts.image_cmds) do
+        if vim.fn.executable(preset[1]) == 1 then
+            return preset
+        end
+    end
+    return nil
+end
+
 --- Cache paths for a diagram, keyed by renderer, theme, canvas size, and
---- source: a theme switch, a resize, or an edit is a fresh render, everything
---- else is a hit.
+--- source: a renderer or theme switch, a resize, or an edit is a fresh render,
+--- everything else is a hit.
 ---@param size? mermaid.ImageSize
-local function image_paths(src, size)
-    local config = vim.json.encode(image_theme())
+---@param preset? string[] renderer command; defaults to the first available
+local function image_paths(src, size, preset)
+    preset = preset or image_cmd() or {}
+    local theme = image_theme()
+    local config = vim.json.encode(theme)
     local canvas = size and (size.width .. "x" .. size.height) or "natural"
-    local key = vim.fn
-        .sha256(table.concat(M.opts.image_cmd, "\1") .. "\n" .. config .. "\n" .. canvas .. "\n" .. src)
-        :sub(1, 16)
+    local key = vim.fn.sha256(table.concat(preset, "\1") .. "\n" .. config .. "\n" .. canvas .. "\n" .. src):sub(1, 16)
     local base = vim.fn.stdpath("cache") .. "/mermaid/" .. key
-    return { base = base, mmd = base .. ".mmd", config = config, config_file = base .. ".json", png = base .. ".png" }
+    return {
+        base = base,
+        mmd = base .. ".mmd",
+        config = config,
+        config_file = base .. ".json",
+        png = base .. ".png",
+        background = theme.themeVariables.background,
+    }
 end
 
 local function write_file(path, text)
@@ -626,11 +658,15 @@ end
 ---@param size? mermaid.ImageSize canvas in pixels; nil renders at the diagram's natural size
 ---@param cb fun(png: string?, err: string?)
 local function render_image(src, size, cb)
-    local exe = M.opts.image_cmd[1]
-    if vim.fn.executable(exe) ~= 1 then
-        return cb(nil, ("`%s` (the mermaid image renderer) is not on PATH"):format(exe))
+    local preset = image_cmd()
+    if not preset then
+        local names = vim.tbl_map(function(p)
+            return p[1]
+        end, M.opts.image_cmds)
+        return cb(nil, "no mermaid image renderer on PATH (" .. table.concat(names, " or ") .. ")")
     end
-    local paths = image_paths(src, size)
+    local exe = preset[1]
+    local paths = image_paths(src, size, preset)
     if vim.fn.filereadable(paths.png) == 1 then
         return cb(paths.png)
     end
@@ -641,10 +677,12 @@ local function render_image(src, size, cb)
         ["{src}"] = paths.mmd,
         ["{file}"] = paths.png,
         ["{config}"] = paths.config_file,
+        ["{theme}"] = vim.o.background == "light" and "default" or "dark",
+        ["{background}"] = paths.background,
         ["{width}"] = size and tostring(size.width),
         ["{height}"] = size and tostring(size.height),
     }
-    local template = vim.list_extend(vim.deepcopy(M.opts.image_cmd), size and M.opts.image_size or {})
+    local template = vim.list_extend(vim.deepcopy(preset), size and M.opts.image_size or {})
     local cmd = vim.tbl_map(function(arg)
         return subst[arg] or arg
     end, template)

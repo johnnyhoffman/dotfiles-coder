@@ -212,26 +212,22 @@ install_magick() {
         || fail imagemagick
 }
 
-install_mmdr() {
-    # Mermaid → PNG for nvim's image renders (config/mermaid.lua): pure Rust,
-    # no browser. The release tarball is just the binary.
-    have mmdr && return
-    log "installing mmdr"
-    fetch_tar "https://github.com/1jehuang/mermaid-rs-renderer/releases/latest/download/mmdr-${ARCH}-unknown-linux-gnu.tar.gz" \
-        "$LOCAL_BIN" || fail mmdr
-}
-
-install_termaid() {
-    # Mermaid → Unicode text for nvim's text renders; the `rich` extra is what
-    # colours them. Its own venv keeps rich out of the system python.
-    have termaid && return
-    have python3 || { fail termaid; return; }
-    log "installing termaid"
-    local venv="$HOME/.local/share/termaid"
+install_mermaid_tools() {
+    # nvim's mermaid renders (config/mermaid.lua): mermaidx draws PNGs with the
+    # real mermaid.js in an embedded JS engine (no browser; prebuilt wheels for
+    # x86_64 and aarch64, fonts bundled), termaid draws Unicode text — its
+    # `rich` extra is what colours it. One venv for both keeps them out of the
+    # system python.
+    have mermaidx && have termaid && return
+    have python3 || { fail mermaid-tools; return; }
+    log "installing mermaidx + termaid"
+    local venv="$HOME/.local/share/mermaid-tools"
+    rm -rf "$HOME/.local/share/termaid" # venv of the termaid-only predecessor
     { [ -x "$venv/bin/pip" ] || python3 -m venv "$venv"; } \
-        && PIP_DISABLE_PIP_VERSION_CHECK=1 "$venv/bin/pip" install -q 'termaid[rich]' \
+        && PIP_DISABLE_PIP_VERSION_CHECK=1 "$venv/bin/pip" install -q mermaidx 'termaid[rich]' \
+        && ln -sfn "$venv/bin/mermaidx" "$LOCAL_BIN/mermaidx" \
         && ln -sfn "$venv/bin/termaid" "$LOCAL_BIN/termaid" \
-        || fail termaid
+        || fail mermaid-tools
 }
 
 run_capped() { # guard against a hung download stalling the workspace build
@@ -340,8 +336,7 @@ install_starship
 install_mise
 install_node
 install_magick
-install_mmdr
-install_termaid
+install_mermaid_tools
 install_eslint_deps
 install_nvim_plugins
 
