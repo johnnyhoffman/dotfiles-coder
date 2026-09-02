@@ -378,8 +378,11 @@ local function render(src, width, cb)
         return cb(nil, ("`%s` (the mermaid text renderer) is not on PATH"):format(exe))
     end
     -- stdout is a pipe here, so colour-aware CLIs (termaid via rich) would
-    -- drop their escapes unless told otherwise; the parser below handles them
-    local env = { FORCE_COLOR = "1", COLORTERM = "truecolor" }
+    -- drop their escapes unless told otherwise — the parser below handles them
+    -- — and rich would also soft-wrap every line at its 80-column default.
+    -- A huge COLUMNS switches that off; `{width}` alone decides the layout,
+    -- and anything still wider scrolls in the float / virtual lines.
+    local env = { FORCE_COLOR = "1", COLORTERM = "truecolor", COLUMNS = "4096" }
     vim.system(text_cmd(width), { stdin = src .. "\n", text = true, env = env }, function(res)
         vim.schedule(function()
             local stderr = vim.trim(res.stderr or "")
