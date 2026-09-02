@@ -186,6 +186,28 @@ install_node() {
     mise use -g -q node@lts || fail node
 }
 
+install_mmdr() {
+    # Mermaid → PNG for nvim's image renders (config/mermaid.lua): pure Rust,
+    # no browser. The release tarball is just the binary.
+    have mmdr && return
+    log "installing mmdr"
+    fetch_tar "https://github.com/1jehuang/mermaid-rs-renderer/releases/latest/download/mmdr-${ARCH}-unknown-linux-gnu.tar.gz" \
+        "$LOCAL_BIN" || fail mmdr
+}
+
+install_termaid() {
+    # Mermaid → Unicode text for nvim's text renders; the `rich` extra is what
+    # colours them. Its own venv keeps rich out of the system python.
+    have termaid && return
+    have python3 || { fail termaid; return; }
+    log "installing termaid"
+    local venv="$HOME/.local/share/termaid"
+    { [ -x "$venv/bin/pip" ] || python3 -m venv "$venv"; } \
+        && PIP_DISABLE_PIP_VERSION_CHECK=1 "$venv/bin/pip" install -q 'termaid[rich]' \
+        && ln -sfn "$venv/bin/termaid" "$LOCAL_BIN/termaid" \
+        || fail termaid
+}
+
 run_capped() { # guard against a hung download stalling the workspace build
     if have timeout; then timeout 1500 "$@"; else "$@"; fi
 }
@@ -280,7 +302,7 @@ fi
 
 link_home
 ensure_git_identity
-apt_install build-essential unzip python3 python3-venv >/dev/null 2>&1 || true # treesitter/mason helpers (python3: mason's pip packages)
+apt_install build-essential unzip python3 python3-venv imagemagick >/dev/null 2>&1 || true # treesitter/mason helpers (python3: mason's pip packages, termaid's venv); imagemagick: nvim's mermaid image renders
 ensure_zsh
 install_nvim
 install_fzf
@@ -291,6 +313,8 @@ install_zoxide
 install_starship
 install_mise
 install_node
+install_mmdr
+install_termaid
 install_eslint_deps
 install_nvim_plugins
 

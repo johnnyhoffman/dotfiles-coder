@@ -17,6 +17,10 @@ return {
     ---@type CatppuccinOptions
     opts = {
         flavour = "mocha",
+        -- Export the palette as vim.g.terminal_color_0-15: colours :terminal, and
+        -- anything that maps ANSI colours to highlights (config/mermaid.lua's
+        -- text renders) picks up the theme instead of the stock xterm colours.
+        term_colors = true,
         custom_highlights = function(colors)
             return {
                 -- Status column backgrounds

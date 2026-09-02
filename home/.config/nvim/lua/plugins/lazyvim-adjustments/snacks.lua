@@ -390,6 +390,22 @@ return {
 
         return vim.tbl_deep_extend("force", opts, {
             statuscolumn = { enabled = false },
+            -- Until now snacks.image was only reached through the picker preview
+            -- and the dashboard; declaring it here turns it on for real buffers.
+            -- Both automatic doc modes are off on purpose: no images drawn inline
+            -- on their own, and no hover float when the cursor lands on a fence.
+            -- config/mermaid.lua renders ```mermaid fences to PNG itself (mmdr, no
+            -- Chromium) and uses only the placement API here, on demand —
+            -- <localleader>mm for a float, <localleader>mi for inline (needs
+            -- unicode placeholders, i.e. bare Ghostty; the Zellij patch above
+            -- leaves them off). Termux has no graphics protocol at all — the text
+            -- renderer covers it there.
+            image = {
+                doc = {
+                    inline = false,
+                    float = false,
+                },
+            },
             ---@type snacks.scratch.Config
             scratch = {
                 -- Markdown always, instead of inheriting the current buffer's

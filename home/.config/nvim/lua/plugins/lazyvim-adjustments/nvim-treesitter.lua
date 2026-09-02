@@ -9,6 +9,7 @@ return {
             "lua",
             "markdown",
             "markdown_inline",
+            "mermaid", -- highlights ```mermaid fences via the generic fence injection
             "python",
             "query",
             "regex",

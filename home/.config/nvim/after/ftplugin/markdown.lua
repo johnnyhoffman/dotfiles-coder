@@ -104,6 +104,9 @@ end, { buffer = true, desc = "Markdown bullet-aware O" })
 -- <localleader>f formatting operators (bold/italic/strike/code/highlight/equation/code block)
 require("config.markdown-format").attach()
 
+-- <localleader>m mermaid helpers (float preview, inline render, mermaid.live)
+require("config.mermaid").attach()
+
 -- toggle conceallevel based on mode
 --     insert mode: show raw syntax (conceallevel=0)
 --     normal mode: allow concealing (conceallevel=2)
