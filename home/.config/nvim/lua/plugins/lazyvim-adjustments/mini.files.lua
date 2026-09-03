@@ -7,6 +7,26 @@ return {
     -- nothing else competes to be the default explorer.
     lazy = false,
     version = "*",
+    -- Buffer-local mappings live in `init`, not `config`: lazy.nvim does not merge
+    -- `config`, so defining one here would clobber the LazyVim extra's (g. toggle
+    -- hidden, gc set cwd, <C-w>s/v splits, Snacks rename hook). A User autocmd
+    -- doesn't need the plugin loaded, so `init` is safe.
+    init = function()
+        vim.api.nvim_create_autocmd("User", {
+            pattern = "MiniFilesBufferCreate",
+            callback = function(args)
+                -- Not `gx`: the built-in resolves <cfile> against nvim's cwd, not the
+                -- directory being browsed, so it opens the wrong path.
+                vim.keymap.set("n", "gX", function()
+                    local entry = require("mini.files").get_fs_entry()
+                    if not entry then
+                        return vim.notify("Cursor is not on a valid entry")
+                    end
+                    vim.ui.open(entry.path)
+                end, { buffer = args.data.buf_id, desc = "Open with system default app" })
+            end,
+        })
+    end,
     opts = {
         windows = {
             width_focus = 35,

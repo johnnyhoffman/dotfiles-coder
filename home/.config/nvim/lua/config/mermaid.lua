@@ -357,6 +357,117 @@ local function row_text(row)
 end
 
 ---------------------------------------------------------------------------
+-- The preview float
+---------------------------------------------------------------------------
+
+local float_win ---@type snacks.win? the one preview float; opening another replaces it
+
+--- Set a Snacks.win scratch buffer's lines (it keeps them read-only).
+local function set_lines(win, lines)
+    vim.bo[win.buf].modifiable = true
+    api.nvim_buf_set_lines(win.buf, 0, -1, false, lines)
+    vim.bo[win.buf].modifiable = false
+end
+
+--- Size a float to `width` × `height` cells (kept inside the editor) and re-centre it.
+local function resize(win, width, height)
+    win.opts.width = math.max(1, math.min(width, vim.o.columns - 4))
+    win.opts.height = math.max(1, math.min(height, vim.o.lines - 4))
+    win:update()
+end
+
+--- A preview float that opens at once with a spinner when the render takes
+--- longer than a blink, and gets its content swapped in by the caller.
+---@param title string
+---@return { win: fun(): snacks.win?, fail: fun(msg: string) }
+local function loading_float(title)
+    local win ---@type snacks.win?
+    local timer ---@type uv.uv_timer_t?
+    local pending = true
+
+    local function stop_spinner()
+        if timer then
+            timer:stop()
+            timer:close()
+            timer = nil
+        end
+    end
+
+    -- the window; nil once the user has closed it
+    local function ensure()
+        if win then
+            return win:valid() and win or nil
+        end
+        if float_win and float_win:valid() then
+            float_win:close()
+        end
+        win = Snacks.win({
+            position = "float",
+            relative = "editor",
+            border = "rounded",
+            title = title,
+            title_pos = "center",
+            width = 24,
+            height = 1,
+            enter = true,
+            wo = { wrap = false, winblend = 0 },
+            keys = { q = "close", ["<Esc>"] = "close" },
+            on_close = stop_spinner,
+        })
+        float_win = win
+        return win
+    end
+
+    -- show the spinner only if the render is still pending after a grace
+    -- period, so cache hits never flash an empty popup
+    vim.defer_fn(function()
+        if not pending then
+            return
+        end
+        local w = ensure()
+        if not w then
+            return
+        end
+        timer = vim.uv.new_timer()
+        timer:start(
+            0,
+            80,
+            vim.schedule_wrap(function()
+                if not w:valid() then
+                    return stop_spinner()
+                end
+                set_lines(w, { " " .. Snacks.util.spinner() .. " rendering…" })
+            end)
+        )
+    end, 150)
+
+    return {
+        --- The window, ready for content (opened now if the grace period hasn't
+        --- elapsed); nil when the user closed it while waiting.
+        win = function()
+            pending = false
+            stop_spinner()
+            return ensure()
+        end,
+        --- Show an error in the float if it's open, else as a notification.
+        fail = function(msg)
+            pending = false
+            stop_spinner()
+            if not (win and win:valid()) then
+                return notify(msg, vim.log.levels.ERROR)
+            end
+            local lines = vim.split(msg, "\n", { plain = true })
+            set_lines(win, lines)
+            local w = 0
+            for _, l in ipairs(lines) do
+                w = math.max(w, vim.fn.strdisplaywidth(l))
+            end
+            resize(win, w, #lines)
+        end,
+    }
+end
+
+---------------------------------------------------------------------------
 -- Text rendering
 ---------------------------------------------------------------------------
 
@@ -429,28 +540,23 @@ function M.float()
         return
     end
     local max_w, max_h = math.floor(vim.o.columns * 0.9), math.floor(vim.o.lines * 0.85)
+    local loader = loading_float(" mermaid ")
     render(fence.src, max_w, function(rows, err)
         if not rows then
-            return notify(err, vim.log.levels.ERROR)
+            return loader.fail(err)
+        end
+        local win = loader.win()
+        if not win then
+            return
         end
         local lines = vim.tbl_map(row_text, rows)
         local w = 0
         for _, l in ipairs(lines) do
             w = math.max(w, vim.fn.strdisplaywidth(l))
         end
-        local win = Snacks.win({
-            text = lines,
-            width = math.min(w, max_w),
-            height = math.min(#lines, max_h),
-            position = "float",
-            border = "rounded",
-            title = " mermaid ",
-            title_pos = "center",
-            enter = true,
-            wo = { wrap = false },
-            keys = { q = "close", ["<Esc>"] = "close" },
-        })
+        set_lines(win, lines)
         -- colour the chunks in place
+        api.nvim_buf_clear_namespace(win.buf, ns, 0, -1)
         for r, row in ipairs(rows) do
             local col = 0
             for _, chunk in ipairs(row) do
@@ -466,6 +572,7 @@ function M.float()
                 col = col + #chunk[1]
             end
         end
+        resize(win, math.min(w, max_w), math.min(#lines, max_h))
     end)
 end
 
@@ -705,8 +812,6 @@ local function image_opts(extra)
     return Snacks.config.merge({}, Snacks.image.config.doc, extra)
 end
 
-local image_win ---@type snacks.win?
-
 --- Render the fence under the cursor as an image in a floating window.
 function M.image_float()
     if not Snacks.image.supports_terminal() then
@@ -723,34 +828,27 @@ function M.image_float()
     local max_w, max_h = math.floor(vim.o.columns * 0.9) - 2, math.floor(vim.o.lines * 0.9) - 2
     local cell = Snacks.image.terminal.size()
     local size = { width = max_w * cell.cell_width, height = max_h * cell.cell_height }
+    local loader = loading_float(" mermaid ")
     render_image(fence.src, size, function(png, err)
         if not png then
-            return notify(err, vim.log.levels.ERROR)
+            return loader.fail(err)
         end
-        if image_win and image_win:valid() then
-            image_win:close()
+        local win = loader.win()
+        if not win then
+            return
         end
+        -- snacks fits an image to the windows showing its buffer, so the
+        -- window is hidden while the placement sizes itself against the box,
+        -- then shown at the fitted size — the same dance as snacks' hover
+        win:hide()
+        set_lines(win, {})
         local placement ---@type snacks.image.Placement?
-        -- Entered, so `q` closes it and it stays put while you move around.
-        local win = Snacks.win({
-            show = false,
-            enter = true,
-            position = "float",
-            relative = "editor",
-            border = "rounded",
-            width = max_w,
-            height = max_h,
-            keys = { q = "close", ["<Esc>"] = "close" },
-            wo = { winblend = Snacks.image.terminal.env().placeholders and 0 or nil },
-            on_close = function()
-                if placement then
-                    placement:close()
-                    placement = nil
-                end
-            end,
-        })
-        image_win = win
-        win:open_buf()
+        win.opts.on_close = function()
+            if placement then
+                placement:close()
+                placement = nil
+            end
+        end
         local shown = false
         placement = Snacks.image.placement.new(
             win.buf,
@@ -759,8 +857,6 @@ function M.image_float()
                 inline = false,
                 max_width = max_w,
                 max_height = max_h,
-                -- the window is sized to the fitted image (the box, give or
-                -- take a rounding cell) once snacks knows its cell size
                 on_update_pre = function(p)
                     if shown then
                         return
@@ -809,6 +905,69 @@ function M.toggle_image_inline()
                 conceal = false, -- keep the fence text; the picture goes in virtual lines below it
             })
         )
+    end)
+end
+
+---------------------------------------------------------------------------
+-- Saving
+---------------------------------------------------------------------------
+
+--- The diagram type of a fence, for file names: the first keyword after any
+--- frontmatter or `%%` comments, lowercased, with `Diagram`, `-beta`, and
+--- `-v2` dropped (`sequenceDiagram` → sequence, `treemap-beta` → treemap) and
+--- `graph` reported as flowchart.
+local function diagram_type(src)
+    local in_frontmatter = false
+    for line in (src .. "\n"):gmatch("([^\n]*)\n") do
+        local l = vim.trim(line)
+        if l == "---" then
+            in_frontmatter = not in_frontmatter
+        elseif not in_frontmatter and l ~= "" and not l:match("^%%%%") then
+            local word = (l:match("^([%w-]+)") or "diagram"):lower()
+            word = word:gsub("%-beta$", ""):gsub("%-v2$", ""):gsub("diagram$", "")
+            return word == "graph" and "flowchart" or word
+        end
+    end
+    return "diagram"
+end
+
+--- Save the fence under the cursor as a PNG. Prompts for a name (the `.png`
+--- is added; a name with `/` is a path, `~` expands), defaulting to
+--- `mermaid-{type}_{YYYYMMDDHHmmss}` next to the markdown file.
+function M.save_image()
+    local buf, fence = current_fence()
+    if not fence then
+        return
+    end
+    local default = ("mermaid-%s_%s"):format(diagram_type(fence.src), os.date("%Y%m%d%H%M%S"))
+    vim.ui.input({ prompt = "Save diagram as (.png added): ", default = default, completion = "file" }, function(name)
+        name = name and vim.trim(name) or ""
+        if name == "" then
+            return
+        end
+        name = name:gsub("%.png$", "")
+        local dir = vim.fs.dirname(api.nvim_buf_get_name(buf))
+        if dir == "" or dir == "." then
+            dir = vim.fn.getcwd()
+        end
+        local dest = vim.fn.expand(name) .. ".png"
+        if not vim.startswith(dest, "/") then
+            dest = vim.fs.joinpath(dir, dest)
+        end
+        if vim.uv.fs_stat(dest) and vim.fn.confirm(("Overwrite %s?"):format(dest), "&Yes\n&No", 2) ~= 1 then
+            return
+        end
+        render_image(fence.src, nil, function(png, err)
+            if not png then
+                return notify(err, vim.log.levels.ERROR)
+            end
+            vim.fn.mkdir(vim.fs.dirname(dest), "p")
+            local ok, cerr = vim.uv.fs_copyfile(png, dest)
+            if not ok then
+                return notify("Could not save the diagram: " .. tostring(cerr), vim.log.levels.ERROR)
+            end
+            notify("Saved " .. dest, vim.log.levels.INFO)
+        end)
     end)
 end
 
@@ -870,6 +1029,7 @@ function M.attach()
     map("<localleader>mi", M.toggle_image_inline, "Mermaid: toggle image below the fence")
     map("<localleader>mI", M.toggle_inline, "Mermaid: toggle text render below the fence")
     map("<localleader>mc", M.clear, "Mermaid: clear inline renders")
+    map("<localleader>ms", M.save_image, "Mermaid: save as PNG")
     pcall(function()
         require("which-key").add({ { "<localleader>m", buffer = buf, group = "mermaid" } })
     end)
@@ -897,5 +1057,10 @@ M.fences = fences
 M.fence_at = fence_at
 M.render_text = render
 M.render_image = render_image
+M.diagram_type = diagram_type
+--- The open preview float, if any (for scripting).
+function M.preview_float()
+    return float_win and float_win:valid() and float_win or nil
+end
 
 return M

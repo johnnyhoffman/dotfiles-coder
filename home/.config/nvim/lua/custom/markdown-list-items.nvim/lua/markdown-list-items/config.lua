@@ -48,12 +48,12 @@ M.defaults = {
   -- for plain checkboxes, or appends/strips `x` on the typed markers in `secondary_marks`.
   mappings = {
     cycle = "<localleader>L",
-    plain = "<localleader><BS>",
-    bullet = "<localleader>-",
+    plain = "<localleader>x<BS>",
+    bullet = "<localleader>x-",
     unchecked = "<localleader>x<Space>",
     checked = "<localleader>xx",
     secondary_x = "<localleader>X",
-    cancelled = "<localleader>x-",
+    cancelled = "<localleader>x~",
     question = "<localleader>x?",
     in_progress = "<localleader>x/",
     rescheduled = "<localleader>x>",

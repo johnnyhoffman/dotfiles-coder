@@ -44,8 +44,8 @@ local PLUG_MAPPINGS = {
 ---@type table<string, string>
 local DESCRIPTIONS = {
   cycle = "List: cycle item type",
-  plain = "List: make plain text",
-  bullet = "List: make bullet",
+  plain = "plain text",
+  bullet = "bullet",
   unchecked = "unchecked | planning docs: undecided option / open to-do",
   checked = "checked | planning docs: accept / agree to choice",
   cancelled = "cancelled | planning docs: ruled out / dropped",
