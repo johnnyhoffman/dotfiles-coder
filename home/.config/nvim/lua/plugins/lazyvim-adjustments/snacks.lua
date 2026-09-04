@@ -19,6 +19,80 @@ local SPLASH = (USE_DOG_SPLASH and HAS_KITTY_GRAPHICS) and "image"
     or (USE_DOG_SPLASH and vim.fn.executable("chafa") == 1) and "chafa"
     or "minimal"
 
+-- snacks.image hands an image's data to the terminal exactly once per nvim
+-- process: it caches the image in a private registry, marks it `sent`, and only
+-- ever clears that under a 200MB LRU. (`Snacks.image.image.clear()` would reset
+-- it too, but nothing in snacks calls it.) The terminal drops the data behind
+-- snacks' back, though — Zellij redraws a pane on resize, and snacks itself
+-- deletes the image (`a=d,d=i`) once a buffer's last placement closes, after
+-- which the terminal is free to reclaim it. Every request carries `q=2`, so the
+-- terminal's "no such image" reply is suppressed and the stale placement
+-- silently draws nothing: an image lost to a resize or a buffer reopen stays
+-- blank until nvim restarts, restarting being the only thing that clears the
+-- registry. Re-transmitting is cheap and the protocol expects it, so drop
+-- `sent` whenever the data may be gone and let snacks send it again.
+local function patch_image_retransmit()
+    local images = require("snacks.image.image")
+    if images._retransmit_patched then
+        return
+    end
+    images._retransmit_patched = true
+
+    -- The registry itself is private, so keep our own as the images are made.
+    -- Weak keys: an entry survives exactly as long as snacks' own reference.
+    local live = setmetatable({}, { __mode = "k" })
+    local new = images.new
+    images.new = function(src)
+        local img = new(src)
+        live[img] = true
+        return img
+    end
+
+    -- Images share the one metatable, so wrapping `del` covers all of them.
+    local del = images.del
+    images.del = function(self, pid)
+        del(self, pid)
+        if not next(self.placements) then
+            self.sent = false -- the data is the terminal's to discard now
+        end
+    end
+
+    --- Re-send an image and redraw whatever is placing it.
+    local function retransmit(img)
+        if not img.sent or not img:ready() then
+            return
+        end
+        img.sent = false
+        -- A placement skips drawing when asked for the state it drew last, so
+        -- that cache has to go or the update returns before drawing anything.
+        for _, placement in pairs(img.placements) do
+            placement._state = nil
+        end
+        img:send() -- fans back out to each placement's update()
+    end
+
+    local function refresh()
+        -- Behind snacks' own resize handling, which recomputes the cell size
+        -- and the window geometry that placements are measured against.
+        vim.schedule(function()
+            for img in pairs(live) do
+                retransmit(img)
+            end
+        end)
+    end
+
+    vim.api.nvim_create_autocmd("VimResized", {
+        group = vim.api.nvim_create_augroup("snacks-image-retransmit", { clear = true }),
+        callback = refresh,
+    })
+
+    -- For the redraws that raise no VimResized — reattaching a Zellij session,
+    -- say. Still beats restarting nvim.
+    vim.api.nvim_create_user_command("SnacksImageRefresh", refresh, {
+        desc = "Re-send every live snacks.image to the terminal",
+    })
+end
+
 return {
     "folke/snacks.nvim",
     opts = function(_, opts)
@@ -40,6 +114,14 @@ return {
                     e.supported = true
                 end
             end
+        end
+
+        -- Deferred: snacks.image freezes its config the first time the module
+        -- loads, and that has to happen after `Snacks.setup()` merges the opts
+        -- being built right here. Gated on kitty graphics so the hosts that
+        -- cannot draw images never load the module at all.
+        if HAS_KITTY_GRAPHICS then
+            vim.schedule(patch_image_retransmit)
         end
 
         -- Make SnacksDim darker (lower blend = more dimmed, default is 80)

@@ -14,6 +14,8 @@
 --     lazyvim-adjustments/snacks.lua so nothing pops up on its own. The float
 --     works in any kitty-graphics terminal (Zellij included); inline needs
 --     unicode placeholders, so bare Ghostty only until Zellij ships them.
+--     PNGs are cached on disk by content, so a diagram is rendered once and
+--     every later view is a file read; the cache sweeps itself (M.opts.cache).
 
 local api = vim.api
 
@@ -56,6 +58,14 @@ M.opts = {
     -- size of its box, so the drawing is scaled up to fit it). Same flags for
     -- all of the renderers above.
     image_size = { "-w", "{width}", "-H", "{height}" },
+    -- The PNG cache (stdpath("cache")/mermaid). A hit touches its files, so
+    -- `max_age_days` counts from the last time a diagram was *viewed*, not
+    -- from the render — a diagram you keep coming back to never expires, one
+    -- you edited away from is gone a fortnight later. The sweep runs at most
+    -- once per nvim session and once per `sweep_every_hours` across sessions
+    -- (a stamp file in the cache is the clock), deferred by `sweep_delay_ms`
+    -- past the buffer attaching so it never competes with opening a file.
+    cache = { max_age_days = 14, sweep_every_hours = 24, sweep_delay_ms = 2000 },
 }
 
 local ns = api.nvim_create_namespace("mermaid_inline")
@@ -734,6 +744,8 @@ local function image_cmd()
     return nil
 end
 
+local cache_dir = vim.fn.stdpath("cache") .. "/mermaid"
+
 --- Cache paths for a diagram, keyed by renderer, theme, canvas size, and
 --- source: a renderer or theme switch, a resize, or an edit is a fresh render,
 --- everything else is a hit.
@@ -745,7 +757,7 @@ local function image_paths(src, size, preset)
     local config = vim.json.encode(theme)
     local canvas = size and (size.width .. "x" .. size.height) or "natural"
     local key = vim.fn.sha256(table.concat(preset, "\1") .. "\n" .. config .. "\n" .. canvas .. "\n" .. src):sub(1, 16)
-    local base = vim.fn.stdpath("cache") .. "/mermaid/" .. key
+    local base = cache_dir .. "/" .. key
     return {
         base = base,
         mmd = base .. ".mmd",
@@ -754,6 +766,62 @@ local function image_paths(src, size, preset)
         png = base .. ".png",
         background = theme.themeVariables.background,
     }
+end
+
+--- Bump a cache entry's timestamps. The sweep goes by mtime, so without this
+--- a diagram you open every day would still expire on the render's schedule.
+local function touch(paths)
+    local now = os.time()
+    for _, path in ipairs({ paths.png, paths.mmd, paths.config_file }) do
+        vim.uv.fs_utime(path, now, now) -- missing files just fail, which is fine
+    end
+end
+
+--- Delete every cache file untouched for `max_age_days` and restamp the clock.
+--- Whole entries go together because their three files are touched together;
+--- the debris a failed render leaves behind (a `.mmd`/`.json` whose PNG never
+--- appeared) ages out the same way, having nothing to touch it.
+local function sweep_cache()
+    if not vim.uv.fs_stat(cache_dir) then
+        return
+    end
+    local stamp = cache_dir .. "/last-sweep"
+    local fd = vim.uv.fs_open(stamp, "w", tonumber("644", 8))
+    if fd then
+        vim.uv.fs_close(fd)
+    end
+    local scan = vim.uv.fs_scandir(cache_dir)
+    if not scan then
+        return
+    end
+    local cutoff = os.time() - M.opts.cache.max_age_days * 86400
+    while true do
+        local name = vim.uv.fs_scandir_next(scan)
+        if not name then
+            return
+        end
+        local path = cache_dir .. "/" .. name
+        local stat = path ~= stamp and vim.uv.fs_stat(path)
+        if stat and stat.type == "file" and stat.mtime.sec < cutoff then
+            vim.uv.fs_unlink(path)
+        end
+    end
+end
+
+local swept = false
+
+--- Queue the sweep: once per nvim session, and once per `sweep_every_hours`
+--- across sessions, so opening a markdown file usually costs one stat.
+local function schedule_sweep()
+    if swept then
+        return
+    end
+    swept = true
+    local last = vim.uv.fs_stat(cache_dir .. "/last-sweep")
+    if last and os.time() - last.mtime.sec < M.opts.cache.sweep_every_hours * 3600 then
+        return
+    end
+    vim.defer_fn(sweep_cache, M.opts.cache.sweep_delay_ms)
 end
 
 local function write_file(path, text)
@@ -775,6 +843,7 @@ local function render_image(src, size, cb)
     local exe = preset[1]
     local paths = image_paths(src, size, preset)
     if vim.fn.filereadable(paths.png) == 1 then
+        touch(paths) -- viewed today, so keep it for another `max_age_days`
         return cb(paths.png)
     end
     vim.fn.mkdir(vim.fs.dirname(paths.base), "p")
@@ -1051,12 +1120,16 @@ function M.attach()
             image_inline[buf] = nil -- snacks closes the placements themselves
         end,
     })
+
+    -- Housekeeping for the PNG cache, throttled to a stat in the common case.
+    schedule_sweep()
 end
 
 M.fences = fences
 M.fence_at = fence_at
 M.render_text = render
 M.render_image = render_image
+M.sweep_cache = sweep_cache
 M.diagram_type = diagram_type
 --- The open preview float, if any (for scripting).
 function M.preview_float()
