@@ -1,6 +1,227 @@
 // TILED
+//
+// First layout listed is the one a new session starts in; Ctrl F11/F12 cycle.
 
-swap_tiled_layout name="focal" {
+// Two top-level COLUMNS, each a 70/30 top-over-bottom. Zellij fills
+// top-level sections in creation order, alternating between them, so panes
+// 1 and 2 take the two tops and everything after alternates between the two
+// bottoms - the top pair never gets displaced.
+//
+// Enumerated per pane count on purpose: two `children` growth points do NOT
+// alternate (the first absorbs nearly all panes, leaving one lonely wide pane
+// on the right), so the counts are spelled out instead.
+swap_tiled_layout name="2-top" {
+    tab max_panes=3 {
+        pane split_direction="vertical" {
+            pane
+            pane
+        }
+    }
+    tab max_panes=4 {
+        pane split_direction="vertical" {
+            pane size="50%" split_direction="horizontal" {
+                pane size="70%"
+                pane size="30%"
+            }
+            pane size="50%"
+        }
+    }
+    tab max_panes=5 {
+        pane split_direction="vertical" {
+            pane size="50%" split_direction="horizontal" {
+                pane size="70%"
+                pane size="30%"
+            }
+            pane size="50%" split_direction="horizontal" {
+                pane size="70%"
+                pane size="30%"
+            }
+        }
+    }
+    tab max_panes=6 {
+        pane split_direction="vertical" {
+            pane size="50%" split_direction="horizontal" {
+                pane size="70%"
+                pane size="30%" split_direction="vertical" {
+                    pane
+                    pane
+                }
+            }
+            pane size="50%" split_direction="horizontal" {
+                pane size="70%"
+                pane size="30%"
+            }
+        }
+    }
+    tab max_panes=7 {
+        pane split_direction="vertical" {
+            pane size="50%" split_direction="horizontal" {
+                pane size="70%"
+                pane size="30%" split_direction="vertical" {
+                    pane
+                    pane
+                }
+            }
+            pane size="50%" split_direction="horizontal" {
+                pane size="70%"
+                pane size="30%" split_direction="vertical" {
+                    pane
+                    pane
+                }
+            }
+        }
+    }
+    tab max_panes=8 {
+        pane split_direction="vertical" {
+            pane size="50%" split_direction="horizontal" {
+                pane size="70%"
+                pane size="30%" split_direction="vertical" {
+                    pane
+                    pane
+                    pane
+                }
+            }
+            pane size="50%" split_direction="horizontal" {
+                pane size="70%"
+                pane size="30%" split_direction="vertical" {
+                    pane
+                    pane
+                }
+            }
+        }
+    }
+    tab max_panes=9 {
+        pane split_direction="vertical" {
+            pane size="50%" split_direction="horizontal" {
+                pane size="70%"
+                pane size="30%" split_direction="vertical" {
+                    pane
+                    pane
+                    pane
+                }
+            }
+            pane size="50%" split_direction="horizontal" {
+                pane size="70%"
+                pane size="30%" split_direction="vertical" {
+                    pane
+                    pane
+                    pane
+                }
+            }
+        }
+    }
+    tab max_panes=10 {
+        pane split_direction="vertical" {
+            pane size="50%" split_direction="horizontal" {
+                pane size="70%"
+                pane size="30%" split_direction="vertical" {
+                    pane
+                    pane
+                    pane
+                    pane
+                }
+            }
+            pane size="50%" split_direction="horizontal" {
+                pane size="70%"
+                pane size="30%" split_direction="vertical" {
+                    pane
+                    pane
+                    pane
+                }
+            }
+        }
+    }
+    tab max_panes=11 {
+        pane split_direction="vertical" {
+            pane size="50%" split_direction="horizontal" {
+                pane size="70%"
+                pane size="30%" split_direction="vertical" {
+                    pane
+                    pane
+                    pane
+                    pane
+                }
+            }
+            pane size="50%" split_direction="horizontal" {
+                pane size="70%"
+                pane size="30%" split_direction="vertical" {
+                    pane
+                    pane
+                    pane
+                    pane
+                }
+            }
+        }
+    }
+    tab max_panes=12 {
+        pane split_direction="vertical" {
+            pane size="50%" split_direction="horizontal" {
+                pane size="70%"
+                pane size="30%" split_direction="vertical" {
+                    pane
+                    pane
+                    pane
+                    pane
+                    pane
+                }
+            }
+            pane size="50%" split_direction="horizontal" {
+                pane size="70%"
+                pane size="30%" split_direction="vertical" {
+                    pane
+                    pane
+                    pane
+                    pane
+                }
+            }
+        }
+    }
+    tab max_panes=13 {
+        pane split_direction="vertical" {
+            pane size="50%" split_direction="horizontal" {
+                pane size="70%"
+                pane size="30%" split_direction="vertical" {
+                    pane
+                    pane
+                    pane
+                    pane
+                    pane
+                }
+            }
+            pane size="50%" split_direction="horizontal" {
+                pane size="70%"
+                pane size="30%" split_direction="vertical" {
+                    pane
+                    pane
+                    pane
+                    pane
+                    pane
+                }
+            }
+        }
+    }
+    tab {
+        pane split_direction="vertical" {
+            pane size="50%" split_direction="horizontal" {
+                pane size="70%"
+                pane size="30%" split_direction="vertical" {
+                    children
+                }
+            }
+            pane size="50%" split_direction="horizontal" {
+                pane size="70%"
+                pane size="30%" split_direction="vertical" {
+                    pane
+                    pane
+                    pane
+                    pane
+                    pane
+                }
+            }
+        }
+    }
+}
+swap_tiled_layout name="1-left" {
     tab max_panes=7 {
         pane split_direction="vertical" {
             pane size="70%"
