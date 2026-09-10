@@ -1,5 +1,21 @@
--- ltex-ls-plus: Grammar/spell checking LSP for markdown
--- Uses LanguageTool under the hood
+-- ltex-ls-plus: LanguageTool grammar/spell checking for markdown and TeX.
+--
+-- ltex is the DEEP pass, not the always-on one. ../added/harper-ls.lua runs
+-- continuously and covers spelling plus the common grammar slips; ltex is a JVM
+-- that re-checks the whole document on every change, so it is started by hand
+-- when a document is worth a full LanguageTool sweep rather than left attached
+-- to every prose buffer.
+--
+-- Keymaps, normal mode, in the prose filetypes below:
+--     <localleader>gg  attach ltex to this buffer / detach it again
+--     <localleader>gG  stop the ltex server outright, every buffer
+--
+-- Once attached it is a live checker -- squiggles clear as you fix things --
+-- with insert-mode checks suppressed (see below) so typing stays smooth.
+-- Detaching clears its diagnostics, which is what makes the toggle read as
+-- "show me the grammar problems" / "put them away".
+
+local LTEX_FILETYPES = { "markdown", "text", "plaintex", "tex", "gitcommit" }
 
 local LTEX_PROGRESS_TOKEN = "ltex_plus_progress"
 local LTEX_END_DEBOUNCE_MS = 1500
@@ -39,33 +55,6 @@ local function ltex_progress_handler(err, result, ctx, config)
         return
     end
     return default(err, result, ctx, config)
-end
-
--- Check if buffer front matter contains "ltex: false"
-local function should_disable_ltex(bufnr)
-    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, 30, false)
-    local in_frontmatter = false
-    for _, line in ipairs(lines) do
-        if line:match("^%-%-%-$") then
-            if in_frontmatter then
-                return false
-            end
-            in_frontmatter = true
-        elseif in_frontmatter and line:match("^ltex:%s*false") then
-            return true
-        end
-    end
-    return false
-end
-
--- Skip ltex entirely for very large files. ltex checks the whole document at
--- once, and a single full-document pass on a huge buffer can stutter the UI.
--- This is gated at attach-decision time (via root_dir below) so the costly
--- initial check is never even dispatched. No general claim that large files
--- need less grammar checking -- this is purely a freeze-avoidance backstop.
-local LTEX_MAX_LINES = 5000
-local function is_too_large(bufnr)
-    return vim.api.nvim_buf_line_count(bufnr) > LTEX_MAX_LINES
 end
 
 -- Suppress ltex while in insert mode. ltex re-checks the whole document on
@@ -108,29 +97,111 @@ local function ensure_insert_autocmds()
             end
             vim.b[args.buf].ltex_suppressed_ids = nil
             for _, id in ipairs(ids) do
-                vim.lsp.buf_attach_client(args.buf, id)
+                -- The client can be gone by now -- <localleader>gG, or a crash
+                -- mid-edit -- and reattaching a dead id errors.
+                if vim.lsp.get_client_by_id(id) then
+                    vim.lsp.buf_attach_client(args.buf, id)
+                end
             end
         end,
     })
 end
 
+---------------------------------------------------------------------------
+-- On-demand start/stop
+---------------------------------------------------------------------------
+
+local function ltex_clients(bufnr)
+    return vim.lsp.get_clients({ bufnr = bufnr, name = "ltex_plus" })
+end
+
+-- Start ltex for one buffer, from the config registered in `setup` below
+-- (merged with the cmd/filetypes defaults lspconfig ships in lsp/ltex_plus.lua).
+-- root_dir has to be a concrete path: vim.lsp.start does not run the root-marker
+-- search that vim.lsp.enable's autocmd would, and cwd is what the auto-attaching
+-- version resolved to anyway. Starting in a second buffer reuses the running
+-- client rather than paying for another JVM.
+local function ltex_start(bufnr)
+    local config = vim.lsp.config.ltex_plus
+    if not config then
+        vim.notify("ltex: no LSP config registered for ltex_plus", vim.log.levels.ERROR)
+        return
+    end
+    return vim.lsp.start(vim.tbl_extend("force", config, { root_dir = vim.fn.getcwd() }), { bufnr = bufnr })
+end
+
+local function ltex_toggle()
+    local bufnr = vim.api.nvim_get_current_buf()
+    local clients = ltex_clients(bufnr)
+    if #clients == 0 then
+        if ltex_start(bufnr) then
+            vim.notify("ltex: checking " .. vim.fn.expand("%:t"), vim.log.levels.INFO)
+        end
+        return
+    end
+    -- Detaching clears this client's diagnostics for the buffer; stopping it
+    -- once nothing is left attached keeps the JVM from idling on afterwards.
+    vim.b[bufnr].ltex_suppressed_ids = nil
+    for _, client in ipairs(clients) do
+        vim.lsp.buf_detach_client(bufnr, client.id)
+        if vim.tbl_isempty(client.attached_buffers or {}) then
+            vim.lsp.stop_client(client.id)
+        end
+    end
+    vim.notify("ltex: off", vim.log.levels.INFO)
+end
+
+local function ltex_stop_all()
+    local clients = vim.lsp.get_clients({ name = "ltex_plus" })
+    if #clients == 0 then
+        vim.notify("ltex: not running", vim.log.levels.INFO)
+        return
+    end
+    for _, client in ipairs(clients) do
+        vim.lsp.stop_client(client.id)
+    end
+    vim.notify("ltex: stopped", vim.log.levels.INFO)
+end
+
 return {
     {
         "neovim/nvim-lspconfig",
+        -- The keymaps have to exist before ltex does -- they are what starts it
+        -- -- so they bind per prose buffer on FileType, not on LSP attach.
+        init = function()
+            vim.api.nvim_create_autocmd("FileType", {
+                group = vim.api.nvim_create_augroup("LtexOnDemand", { clear = true }),
+                pattern = LTEX_FILETYPES,
+                callback = function(args)
+                    vim.keymap.set("n", "<localleader>gg", ltex_toggle, {
+                        buffer = args.buf,
+                        desc = "Grammar: ltex deep check on this buffer (toggle)",
+                    })
+                    vim.keymap.set("n", "<localleader>gG", ltex_stop_all, {
+                        buffer = args.buf,
+                        desc = "Grammar: stop the ltex server",
+                    })
+                    pcall(function()
+                        require("which-key").add({ { "<localleader>g", buffer = args.buf, group = "grammar" } })
+                    end)
+                end,
+            })
+        end,
         opts = {
+            setup = {
+                -- Register the config without enabling it. Returning true tells
+                -- LazyVim to skip its own vim.lsp.enable() AND to exclude ltex
+                -- from mason-lspconfig's automatic_enable, which leaves
+                -- <localleader>gg as the only thing that starts the server. The
+                -- config still has to be registered so that vim.lsp.config
+                -- .ltex_plus resolves when the keymap fires.
+                ltex_plus = function(server, sopts)
+                    vim.lsp.config(server, sopts)
+                    return true
+                end,
+            },
             servers = {
                 ltex_plus = {
-                    -- Gate attachment: never attach (and so never run the costly
-                    -- initial check) for very large files, or files that opt out
-                    -- via `ltex: false` front matter. on_dir must be called for
-                    -- the server to activate, so skipping it skips ltex entirely
-                    -- -- which means there are no diagnostics to filter later.
-                    root_dir = function(bufnr, on_dir)
-                        if is_too_large(bufnr) or should_disable_ltex(bufnr) then
-                            return
-                        end
-                        on_dir(vim.fn.getcwd())
-                    end,
                     -- Coalesce normal-mode edit bursts (substitutions, paste,
                     -- macros, undo/redo) into fewer full-document checks. Default
                     -- is 150ms; ltex is heavy enough to warrant more. Insert-mode
@@ -142,8 +213,8 @@ return {
                         ensure_insert_autocmds()
                         -- Disable built-in spell in the window(s) actually showing
                         -- this buffer (not just whatever window happens to be
-                        -- current). Disabled buffers never reach on_attach -- see
-                        -- root_dir above.
+                        -- current). harper does the same on its own attach, so
+                        -- this only matters where harper isn't running.
                         for _, win in ipairs(vim.fn.win_findbuf(bufnr)) do
                             vim.wo[win].spell = false
                         end
@@ -165,7 +236,7 @@ return {
                         -- actually been idle for a moment.
                         ["$/progress"] = ltex_progress_handler,
                     },
-                    filetypes = { "markdown", "text", "plaintex", "tex", "gitcommit" },
+                    filetypes = LTEX_FILETYPES,
                     settings = {
                         ltex = {
                             language = "en-US",

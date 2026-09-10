@@ -52,14 +52,15 @@ vim.api.nvim_create_autocmd("User", {
     end,
 })
 
--- Order code actions by LSP server: ltex_plus (grammar/spelling fixes) before
--- the markdown servers. Neovim lists actions in client order and never sorts
+-- Order code actions by LSP server: the prose checkers (ltex_plus's grammar
+-- fixes, then harper_ls's spelling fixes and dictionary adds) before the
+-- markdown servers. Neovim lists actions in client order and never sorts
 -- them, so wrap vim.ui.select and stable-sort codeaction items by server
 -- priority. This file loads on VeryLazy, after snacks has installed its
 -- vim.ui.select at UIEnter, so the wrapper composes with the snacks picker.
 do
     -- Unlisted servers sort after these, keeping their original order.
-    local server_priority = { ltex_plus = 1, ["obsidian-ls"] = 2, marksman = 3 }
+    local server_priority = { ltex_plus = 1, harper_ls = 2, ["obsidian-ls"] = 3, marksman = 4 }
     local base_select = vim.ui.select
     ---@diagnostic disable-next-line: duplicate-set-field
     vim.ui.select = function(items, opts, on_choice)
