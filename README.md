@@ -27,3 +27,7 @@ Coder clones the repo and runs `install.sh`, which symlinks `home/` into `~`, in
 ## Zellij
 
 Interactive shells auto-attach the `default` zellij session; set `ZJ_NO_AUTO=1` to opt out.
+
+## GitHub
+
+nvim's octo.nvim (`<leader>gh…`: issue/PR lists and search) drives `gh`, which the workspace authenticates with `$GH_TOKEN` alone. octo forwards only `GITHUB_TOKEN` to its gh subprocess, so a workspace-only spec (`home/.config/nvim/lua/plugins/lazyvim-adjustments/octo.lua`) passes `GH_TOKEN` through as well; without it every picker reports "You are not logged into any GitHub hosts" even though `gh` works in the shell.
