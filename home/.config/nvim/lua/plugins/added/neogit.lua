@@ -23,6 +23,88 @@ return {
         },
         { "<leader>gL", "<cmd>Neogit log<cr>", desc = "log (menu)" },
     },
+    -- Stock `bD` / `wD` open the finder without `allow_multi`, so the snacks
+    -- picker shows Tab-select but neogit only deletes the first pick. These
+    -- overrides re-run the same finder with multi enabled and loop.
+    config = function(_, opts)
+        require("neogit").setup(opts)
+
+        local Finder = require("neogit.buffers.fuzzy_finder")
+        local git = require("neogit.lib.git")
+        local input = require("neogit.lib.input")
+        local notification = require("neogit.lib.notification")
+        local event = require("neogit.lib.event")
+        local status = require("neogit.buffers.status")
+
+        local branch_actions = require("neogit.popups.branch.actions")
+        branch_actions.delete_branch = function()
+            local picked = Finder.new(git.refs.list_branches()):open_async({
+                prompt_prefix = "Delete branch(es)",
+                allow_multi = true,
+                refocus_status = false,
+            })
+            if not picked or #picked == 0 then
+                return
+            end
+
+            for _, ref in ipairs(picked) do
+                local remote, name = git.branch.parse_remote_branch(ref)
+                local ok = false
+                if remote and remote ~= "." then
+                    if input.get_permission(("Delete remote branch '%s/%s'?"):format(remote, name)) then
+                        ok = git.cli.push.remote(remote).delete.to(name).call():success()
+                    end
+                elseif name == git.branch.current() then
+                    notification.warn(("Skipping '%s': currently checked out"):format(name))
+                elseif name then
+                    ok = git.branch.delete(name) -- prompts itself when unmerged
+                end
+                if ok then
+                    notification.info("Deleted branch " .. ref)
+                    event.send("BranchDelete", { branch_name = name })
+                end
+            end
+        end
+
+        local worktree_actions = require("neogit.popups.worktree.actions")
+        worktree_actions.delete = function()
+            local options = vim.tbl_map(function(w)
+                return w.path
+            end, git.worktree.list({ include_main = false }))
+            if #options == 0 then
+                notification.info("No worktrees present")
+                return
+            end
+
+            local picked = Finder.new(options):open_async({
+                prompt_prefix = "Delete worktree(s)",
+                allow_multi = true,
+            })
+            if not picked or #picked == 0 then
+                return
+            end
+
+            local cwd = vim.fs.normalize(assert(vim.uv.cwd(), "cannot determine cwd"))
+            local main = git.worktree.main()
+            for _, path in ipairs(picked) do
+                if input.get_permission(("Remove worktree at %q?"):format(path)) then
+                    if vim.fs.normalize(path) == cwd and status.is_open() and main then
+                        status.instance():chdir(main.path)
+                    end
+                    local ok = git.worktree.remove(path)
+                    if
+                        not ok
+                        and input.get_permission(("%s has untracked or modified files. Remove anyway?"):format(path))
+                    then
+                        ok = git.worktree.remove(path, { "--force" })
+                    end
+                    if ok then
+                        notification.info("Removed worktree " .. path)
+                    end
+                end
+            end
+        end
+    end,
     opts = {
         mappings = {
             status = {
