@@ -30,10 +30,17 @@ Interactive shells auto-attach the `default` zellij session; set `ZJ_NO_AUTO=1` 
 
 ## GitHub
 
-nvim's octo.nvim (`<leader>gh…`: issue/PR lists and search) drives `gh`. The workspace shell authenticates `gh` with the Coder-provisioned `$GH_TOKEN`, which only carries `repo` + `workflow` (no `read:org`, no `read:project`), and octo's gh subprocess never sees `GH_TOKEN` at all, so it falls through to `~/.config/gh/hosts.yml` (→ `~/.coder-auth/gh-hosts.yml`). Log in there once with a token that has the scopes octo needs:
+nvim's octo.nvim (`<leader>gh…`: issue/PR lists and search) drives `gh`. The workspace shell authenticates `gh` with the Coder-provisioned `$GH_TOKEN`, which only carries `repo` + `workflow` (no `read:org`, no `read:project`), so octo gets its own login in a dedicated gh config dir. Create it once:
 
 ```sh
-env -u GH_TOKEN gh auth login -s read:org
+mkdir -m 700 ~/.coder-auth/gh-octo
+GH_CONFIG_DIR=~/.coder-auth/gh-octo env -u GH_TOKEN gh auth login -s read:org
 ```
 
-Without that login every picker reports "You are not logged into any GitHub hosts" even though `gh` works in the shell. The workspace-only spec `home/.config/nvim/lua/plugins/lazyvim-adjustments/octo.lua` also turns off `default_to_projects_v2` (on in the LazyVim extra), which would otherwise demand `read:project` on octo's first command; add `read:project` to the login and drop that line if you want project fields in PR views.
+The workspace-only spec `home/.config/nvim/lua/plugins/lazyvim-adjustments/octo.lua` points octo at that dir through `gh_env = { GH_CONFIG_DIR = … }`, so shell `gh` keeps using `$GH_TOKEN` and never sees the octo login. `~/.coder-auth/` is synced to S3 by the workspace agent, so the login carries over to new workspaces. Without it every picker reports "You are not logged into any GitHub hosts" even though `gh` works in the shell. To see what octo sees:
+
+```sh
+GH_CONFIG_DIR=~/.coder-auth/gh-octo env -u GH_TOKEN gh auth status
+```
+
+The same spec turns off `default_to_projects_v2` (on in the LazyVim extra), which would otherwise demand `read:project` on octo's first command; add `read:project` to the login and drop that line if you want project fields in PR views.
