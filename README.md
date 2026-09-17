@@ -30,4 +30,10 @@ Interactive shells auto-attach the `default` zellij session; set `ZJ_NO_AUTO=1` 
 
 ## GitHub
 
-nvim's octo.nvim (`<leader>gh…`: issue/PR lists and search) drives `gh`, which the workspace authenticates with `$GH_TOKEN` alone. octo forwards only `GITHUB_TOKEN` to its gh subprocess, so a workspace-only spec (`home/.config/nvim/lua/plugins/lazyvim-adjustments/octo.lua`) passes `GH_TOKEN` through as well; without it every picker reports "You are not logged into any GitHub hosts" even though `gh` works in the shell.
+nvim's octo.nvim (`<leader>gh…`: issue/PR lists and search) drives `gh`. The workspace shell authenticates `gh` with the Coder-provisioned `$GH_TOKEN`, which only carries `repo` + `workflow` (no `read:org`, no `read:project`), and octo's gh subprocess never sees `GH_TOKEN` at all, so it falls through to `~/.config/gh/hosts.yml` (→ `~/.coder-auth/gh-hosts.yml`). Log in there once with a token that has the scopes octo needs:
+
+```sh
+env -u GH_TOKEN gh auth login -s read:org
+```
+
+Without that login every picker reports "You are not logged into any GitHub hosts" even though `gh` works in the shell. The workspace-only spec `home/.config/nvim/lua/plugins/lazyvim-adjustments/octo.lua` also turns off `default_to_projects_v2` (on in the LazyVim extra), which would otherwise demand `read:project` on octo's first command; add `read:project` to the login and drop that line if you want project fields in PR views.
